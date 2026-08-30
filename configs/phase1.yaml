@@ -1,0 +1,53 @@
+# Leaf Sentinel - Phase 1 Configuration
+# Dataset Discovery, Validation & Baseline Preparation
+
+paths:
+  raw_data_dir: "data/raw/plantseg"
+  output_dir: "outputs/phase1"
+  reports_dir: "outputs/phase1/reports"
+  figures_dir: "outputs/phase1/figures"
+  samples_dir: "outputs/phase1/samples"
+
+validation:
+  allowed_image_extensions:
+    - ".jpg"
+    - ".jpeg"
+    - ".png"
+    - ".bmp"
+    - ".webp"
+    - ".tif"
+    - ".tiff"
+  allowed_mask_extensions:
+    - ".png"
+    - ".bmp"
+    - ".tif"
+    - ".tiff"
+    - ".jpg"
+    - ".jpeg"
+  min_resolution: [32, 32]
+  max_aspect_ratio: 5.0
+  check_connected_components: true
+  mask_ratio_tolerance: 0.05  # Tolerance for comparing calculated vs metadata mask ratio
+
+duplicates:
+  exact_hash: "md5"
+  enable_perceptual_hash: true
+  dhash_size: 16             # 16x16 gives a 256-bit difference hash
+  hamming_distance_threshold: 6  # Max distance to consider near-duplicate candidate
+  check_cross_split_leakage: true
+
+feasibility:
+  # Thresholds for heuristic class categorisation
+  strong_candidate_min_samples: 100
+  strong_candidate_min_masks: 80
+  usable_min_samples: 40
+  usable_min_masks: 30
+  limited_min_samples: 15
+  limited_min_masks: 10
+
+visualization:
+  dpi: 300
+  sample_count: 24           # Number of qualitative sample cards to generate
+  colormap: "tab20"
+  mask_overlay_alpha: 0.45
+  mask_overlay_color: [230, 40, 40]  # RGB for disease mask overlay
