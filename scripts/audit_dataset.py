@@ -1,11 +1,8 @@
-"""Phase 1 Pipeline Runner for Leaf Sentinel (AgriVision AI).
-
-Executes the complete dataset discovery, validation, statistical profiling,
-duplicate/leakage analysis, class feasibility heuristic scoring, and visual reporting.
+"""Dataset discovery, integrity validation, statistical profiling & leakage audit runner for LeafSentinel.
 
 Usage:
-    python scripts/run_phase1.py --data data/raw/plantseg
-    python scripts/run_phase1.py --config configs/phase1.yaml
+    python scripts/audit_dataset.py --data data/raw/plantseg
+    python scripts/audit_dataset.py --config configs/dataset_audit.yaml
 """
 
 import argparse
@@ -28,13 +25,12 @@ from src.dataset.statistics import compute_dataset_statistics
 from src.dataset.feasibility import analyze_class_feasibility
 from src.dataset.visualize import generate_all_visualizations
 
-# Setup clean console logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%H:%M:%S"
 )
-logger = logging.getLogger("LeafSentinel.Phase1")
+logger = logging.getLogger("LeafSentinel.DatasetAudit")
 
 
 def load_config(config_path: Path) -> Dict[str, Any]:
@@ -55,14 +51,13 @@ def run_pipeline(
     max_samples: int | None = None,
     quick_mode: bool = False
 ):
-    """Execute the end-to-end Phase 1 dataset discovery and validation audit."""
+    """Execute end-to-end dataset discovery, integrity validation, and statistical audit."""
     logger.info("================================================================================")
-    logger.info(" Leaf Sentinel — Phase 1: Dataset Discovery, Validation & Baseline Preparation ")
+    logger.info(" LeafSentinel — Dataset Discovery, Integrity Validation & Leakage Audit         ")
     logger.info("================================================================================")
     logger.info(f"Target Dataset Root : {data_dir}")
     logger.info(f"Output Directory    : {output_dir}")
 
-    # Output subdirectories
     reports_dir = output_dir / "reports"
     figures_dir = output_dir / "figures"
     samples_dir = output_dir / "samples"
@@ -72,22 +67,18 @@ def run_pipeline(
     samples_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. Dataset Discovery
-    logger.info("\n>>> [Step 1/7] Discovering dataset structure and metadata...")
+    logger.info("\n>>> [Step 1/6] Discovering dataset structure and metadata...")
     discovery = discover_dataset(data_dir)
     logger.info(f"Discovery Summary: {discovery.summary}")
 
     if discovery.records_df.empty:
-        logger.error(
-            f"No image records or metadata found in {data_dir}. "
-            "Ensure the raw PlantSeg dataset is downloaded and extracted into the data directory."
-        )
-        # Write minimal placeholder summary and exit gracefully
+        logger.error(f"No image records found in {data_dir}.")
         with open(reports_dir / "dataset_summary.json", "w", encoding="utf-8") as f:
             json.dump(discovery.to_dict(), f, indent=2)
         return
 
     # 2. Incremental Validation
-    logger.info("\n>>> [Step 2/7] Running incremental image and mask validation...")
+    logger.info("\n>>> [Step 2/6] Running incremental image and mask validation...")
     val_cfg = config.get("validation", {})
     val_report = validate_dataset(
         records_df=discovery.records_df,
@@ -97,14 +88,13 @@ def run_pipeline(
         max_samples=max_samples
     )
     
-    # Save validation errors if any
     if not val_report.errors_df.empty:
         val_errors_path = reports_dir / "validation_errors.csv"
         val_report.errors_df.to_csv(val_errors_path, index=False)
         logger.info(f"Saved {len(val_report.errors_df)} validation issues to {val_errors_path}")
 
     # 3. Duplicate and Cross-Split Data Leakage Analysis
-    logger.info("\n>>> [Step 3/7] Performing duplicate and cross-split leakage analysis...")
+    logger.info("\n>>> [Step 3/6] Performing duplicate and cross-split leakage analysis...")
     dup_cfg = config.get("duplicates", {})
     dup_report = analyze_duplicates(
         validated_df=val_report.validated_df,
@@ -113,13 +103,12 @@ def run_pipeline(
         hamming_threshold=dup_cfg.get("hamming_distance_threshold", 6)
     )
     
-    # Save duplicate candidates report
     dup_candidates_path = reports_dir / "duplicate_candidates.csv"
     dup_report.candidates_df.to_csv(dup_candidates_path, index=False)
     logger.info(f"Saved {len(dup_report.candidates_df)} duplicate candidate pairs to {dup_candidates_path}")
 
     # 4. Statistical Profiling & Aggregation
-    logger.info("\n>>> [Step 4/7] Computing dataset distributions and summary statistics...")
+    logger.info("\n>>> [Step 4/6] Computing dataset distributions and summary statistics...")
     stats = compute_dataset_statistics(
         validated_df=val_report.validated_df,
         dataset_root=data_dir,
@@ -128,7 +117,6 @@ def run_pipeline(
         duplicate_summary=dup_report.summary
     )
 
-    # Save distribution CSVs
     stats.dataset_statistics_df.to_csv(reports_dir / "dataset_statistics.csv", index=False)
     stats.host_dist_df.to_csv(reports_dir / "host_distribution.csv", index=False)
     stats.disease_dist_df.to_csv(reports_dir / "disease_distribution.csv", index=False)
@@ -136,14 +124,13 @@ def run_pipeline(
     stats.split_dist_df.to_csv(reports_dir / "split_distribution.csv", index=False)
     stats.disease_split_df.to_csv(reports_dir / "disease_x_split_distribution.csv")
 
-    # Save main dataset_summary.json
     summary_json_path = reports_dir / "dataset_summary.json"
     with open(summary_json_path, "w", encoding="utf-8") as f:
         json.dump(stats.summary_dict, f, indent=2)
     logger.info(f"Saved comprehensive summary JSON to {summary_json_path}")
 
-    # 5. Class Feasibility Heuristic Analysis
-    logger.info("\n>>> [Step 5/7] Analyzing class feasibility tiers...")
+    # 5. Class Feasibility Analysis
+    logger.info("\n>>> [Step 5/6] Analyzing class feasibility tiers...")
     feas_cfg = config.get("feasibility", {})
     feasibility_df = analyze_class_feasibility(
         validated_df=val_report.validated_df,
@@ -159,7 +146,7 @@ def run_pipeline(
     logger.info(f"Saved class feasibility assessment to {feasibility_path}")
 
     # 6. Visual Analysis & Qualitative Samples
-    logger.info("\n>>> [Step 6/7] Generating publication-quality figures and qualitative samples...")
+    logger.info("\n>>> [Step 6/6] Generating publication-quality figures and qualitative samples...")
     vis_cfg = config.get("visualization", {})
     generate_all_visualizations(
         stats=stats,
@@ -172,10 +159,9 @@ def run_pipeline(
         alpha=vis_cfg.get("mask_overlay_alpha", 0.45)
     )
 
-    # 7. Final Completion Report
-    logger.info("\n>>> [Step 7/7] Phase 1 Pipeline Successfully Executed!")
+    logger.info("\n================================================================================")
+    logger.info(" Dataset Audit Successfully Completed!                                         ")
     logger.info("================================================================================")
-    logger.info(" Key Phase 1 Audit Findings:")
     logger.info(f" • Total Records Discovered : {stats.summary_dict['overview']['total_records']:,}")
     logger.info(f" • Valid Images Validated   : {stats.summary_dict['overview']['valid_images']:,}")
     logger.info(f" • Valid Masks Validated    : {stats.summary_dict['overview']['valid_masks']:,}")
@@ -184,58 +170,53 @@ def run_pipeline(
     logger.info(f" • Cross-Split Leakages     : {dup_report.cross_split_leakage_pairs} candidate pairs")
     logger.info(f" • Reports Saved to         : {reports_dir}")
     logger.info(f" • Figures Saved to         : {figures_dir}")
-    logger.info(f" • Sample Cards Saved to    : {samples_dir}")
     logger.info("================================================================================")
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Leaf Sentinel — Phase 1: Dataset Discovery, Validation & Baseline Preparation"
+        description="LeafSentinel Dataset Discovery, Validation & Leakage Audit CLI"
     )
     parser.add_argument(
         "--data",
         type=str,
         default=None,
-        help="Path to raw dataset directory (default: read from config or data/raw/plantseg)"
+        help="Path to raw dataset directory"
     )
     parser.add_argument(
         "--config",
         type=str,
-        default="configs/phase1.yaml",
+        default="configs/dataset_audit.yaml",
         help="Path to YAML configuration file"
     )
     parser.add_argument(
         "--output",
         type=str,
         default=None,
-        help="Path to output directory (default: read from config or outputs/phase1)"
+        help="Path to output directory"
     )
     parser.add_argument(
         "--max-samples",
         type=int,
         default=None,
-        help="Limit number of samples to process (useful for rapid dry-runs)"
+        help="Limit number of samples to process (for rapid testing)"
     )
     parser.add_argument(
         "--quick",
         action="store_true",
-        help="Run in quick mode (skips heavy pairwise perceptual hashing)"
+        help="Quick mode (skips pairwise perceptual hashing)"
     )
 
     args = parser.parse_args()
-
     config_path = Path(args.config)
     config = load_config(config_path)
 
     data_dir_str = args.data or config.get("paths", {}).get("raw_data_dir", "data/raw/plantseg")
-    output_dir_str = args.output or config.get("paths", {}).get("output_dir", "outputs/phase1")
-
-    data_dir = Path(data_dir_str)
-    output_dir = Path(output_dir_str)
+    output_dir_str = args.output or config.get("paths", {}).get("output_dir", "outputs/audit")
 
     run_pipeline(
-        data_dir=data_dir,
-        output_dir=output_dir,
+        data_dir=Path(data_dir_str),
+        output_dir=Path(output_dir_str),
         config=config,
         max_samples=args.max_samples,
         quick_mode=args.quick

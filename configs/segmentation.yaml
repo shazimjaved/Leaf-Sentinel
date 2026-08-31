@@ -1,0 +1,103 @@
+# LeafSentinel — Lesion Segmentation Baseline Configuration
+
+project:
+  name: LeafSentinel
+  task: lesion_segmentation
+
+paths:
+  raw_data_dir: "data/raw/plantseg"
+  audit_output_dir: "outputs/audit"
+  output_dir: "outputs"
+  dataset_dir: "outputs/dataset"
+  figures_dir: "outputs/figures"
+  training_dir: "outputs/training"
+  evaluation_dir: "outputs/evaluation"
+
+dataset:
+  root: "data/raw/plantseg"
+  image_size: 512
+  
+  # Target 10 agricultural benchmark classes
+  selected_classes:
+    - plant: "Tomato"
+      disease: "tomato early blight"
+      display_name: "Tomato — Early Blight"
+    - plant: "Potato"
+      disease: "potato late blight"
+      display_name: "Potato — Late Blight"
+    - plant: "Apple"
+      disease: "apple black rot"
+      display_name: "Apple — Black Rot"
+    - plant: "Grape"
+      disease: "grape downy mildew"
+      display_name: "Grape — Downy Mildew"
+    - plant: "Corn"
+      disease: "corn gray leaf spot"
+      display_name: "Corn — Gray Leaf Spot"
+    - plant: "Soybean"
+      disease: "soybean frog eye leaf spot"
+      display_name: "Soybean — Frogeye Leaf Spot"
+    - plant: "Bell pepper"
+      disease: "bell pepper bacterial spot"
+      display_name: "Bell Pepper — Bacterial Spot"
+    - plant: "Wheat"
+      disease: "wheat leaf rust"
+      display_name: "Wheat — Leaf Rust"
+    - plant: "Banana"
+      disease: "banana black leaf streak"
+      display_name: "Banana — Black Sigatoka"
+    - plant: "Citrus"
+      disease: "citrus canker"
+      display_name: "Citrus — Citrus Canker"
+
+  healthy:
+    enabled: true
+    max_ratio: 0.20
+
+  anomalous_masks:
+    action: "exclude"
+
+leakage:
+  exact_duplicates: "group"
+  near_duplicates:
+    enabled: true
+    dhash_threshold: 6
+    secondary_verification: "ssim"
+    ssim_threshold: 0.85
+    cross_split_action: "group"
+
+split:
+  train_ratio: 0.70
+  val_ratio: 0.15
+  test_ratio: 0.15
+  seed: 42
+
+model:
+  name: "unet"
+  encoder: "resnet18"
+  pretrained: true
+  in_channels: 3
+  num_classes: 1
+
+loss:
+  bce_weight: 0.5
+  dice_weight: 0.5
+
+training:
+  epochs: 30
+  batch_size: 8
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  num_workers: 0
+  early_stopping_patience: 7
+  mixed_precision: true
+
+smoke_test:
+  image_size: 256
+  max_samples: 32
+  epochs: 1
+  batch_size: 4
+  learning_rate: 0.001
+
+evaluation:
+  threshold: 0.5

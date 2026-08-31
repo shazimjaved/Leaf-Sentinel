@@ -1,49 +1,42 @@
-# Leaf Sentinel
-> **Portfolio-Grade Computer Vision System for Real-World Plant Disease Detection, Fine-Grained Segmentation, Severity Estimation & Crop-Health Analytics.**
+# LeafSentinel
+> **Enterprise-Grade Computer Vision System for In-the-Wild Plant Disease Detection, Fine-Grained Lesion Segmentation, Severity Estimation & Crop-Health Analytics.**
 
 ---
 
 ## 📌 Project Overview
-**Leaf Sentinel** is an enterprise-grade precision agriculture computer vision pipeline engineered to detect, segment, and quantify foliar crop diseases from in-field RGB imagery.
+**LeafSentinel** is a computer vision pipeline engineered to detect, segment, and quantify foliar crop diseases from real-world agricultural RGB imagery.
 
-The project is structured into progressive engineering phases:
-* **Phase 1 (Completed)**: Dataset Discovery, Empirical Audit, Integrity Validation, Data-Leakage Analysis & Class Feasibility Scoping.
-* **Phase 2 (Upcoming)**: Baseline Architecture Selection, Leakage-Free Stratified Benchmarking & Model Training.
-* **Phase 3**: Multi-Task Segmentation, Lesion Area Quantification & Severity Analytics.
-* **Phase 4**: Edge Optimization, ONNX/TensorRT Export & Production API / Dashboard.
+The core pipeline is organized around two foundational milestones:
+1. **Dataset Discovery & Leakage Audit**: Non-destructive data profiling, validation, duplicate detection, and leakage-free benchmark split generation.
+2. **Lesion Segmentation Baseline**: Pixel-level disease localization using a U-Net architecture with ImageNet-pretrained ResNet-18 feature extraction.
 
 ---
 
-## 🔬 Phase 1: Empirical Audit & Dataset Evidence Report
+## 🔬 Benchmark Dataset & Leakage-Free Preparation
 
-Phase 1 performed an automated, non-destructive audit of the **PlantSeg** benchmark dataset (Zenodo/official distribution).
+### 📊 Dataset Profiling & Verification
+* **Source Dataset**: PlantSeg (7,774 high-resolution leaf images across 34 crop hosts and 115 pathology categories).
+* **Two-Stage Duplicate Verification**:
+  * **Stage 1 (Exact)**: MD5 byte-exact matching automatically groups identical files.
+  * **Stage 2 (Near-Duplicates)**: 256-bit Difference Hash (dHash) candidates ($\text{dist} \le 6$) undergo secondary Structural Similarity Index (SSIM $\ge 0.85$) verification.
+* **Zero-Leakage Stratified Splitting**: Disjoint Set Union (Union-Find) connected-component grouping guarantees that **no duplicate group spans across training, validation, and test splits**.
 
-### 📊 Key Dataset Statistics & Findings
-| Metric | Audit Value | Description |
-|---|---|---|
-| **Total Images Discovered** | **7,774** | 100% verified decodable RGB images |
-| **Total Ground Truth Masks** | **7,774** | 7,766 valid masks (8 zero-pixel/edge anomalies flagged) |
-| **Plant Host Species** | **34 Hosts** | Apple, Tomato, Potato, Grape, Corn, Wheat, Banana, Citrus, etc. |
-| **Pathology / Disease Classes**| **115 Categories**| Multi-host fungal, bacterial, viral, and healthy conditions |
-| **Official Partition Split** | **Train: 5,367 \| Val: 1,180 \| Test: 1,227** | Preserved official Zenodo partitioning |
-| **Annotation Formats** | **Dual Convention** | Per-sample binary masks (`.png`) + COCO instance JSONs |
-| **Median Lesion Area Ratio** | **5.42%** | Skewed distribution (range: 0.01% to 84.1%) |
-| **Exact Duplicate Image Pairs**| **290 Pairs** | Byte-exact MD5 collisions across dataset |
-| **Near-Duplicate Pairs (dHash)**| **431 Pairs** | Perceptual 256-bit hash matches (Hamming dist $\le 6$) |
-| **Cross-Split Data Leakage** | **340 Candidate Pairs** | Matches across Train $\leftrightarrow$ Val/Test partitions |
+### 🎯 Benchmark Class Selection
+The initial lesion segmentation benchmark targets 10 high-priority agricultural crops (1,304 total verified samples):
 
----
-
-## 🎯 Class Feasibility Scoping Summary
-
-Based on sample volume, mask integrity, and partition representation, classes are categorized into evidence tiers:
-
-* **Strong Candidates (21 Classes)**: High sample count ($\ge 100$), robust mask density ($\ge 80$), well-balanced splits. (e.g. *Tomato Early Blight*, *Potato Late Blight*, *Apple Black Rot*, *Grape Downy Mildew*, *Corn Gray Leaf Spot*).
-* **Usable (50 Classes)**: Adequate samples ($\ge 40$) and masks ($\ge 30$) suitable for baseline training and transfer learning.
-* **Limited (37 Classes)**: Modest volume ($15\text{--}39$) requiring heavy data augmentation or few-shot techniques.
-* **Insufficient (7 Classes)**: Very low volume ($< 15$ samples); reserved for future data expansion.
-
-Full breakdown available in [`outputs/phase1/reports/class_feasibility.csv`](outputs/phase1/reports/class_feasibility.csv).
+| Crop Host | Disease Pathology | Display Label | Samples |
+|---|---|---|---|
+| **Citrus** | Citrus Canker | Citrus — Citrus Canker | 323 |
+| **Grape** | Downy Mildew | Grape — Downy Mildew | 211 |
+| **Soybean** | Frogeye Leaf Spot | Soybean — Frogeye Leaf Spot | 153 |
+| **Tomato** | Early Blight | Tomato — Early Blight | 153 |
+| **Banana** | Black Sigatoka | Banana — Black Sigatoka | 114 |
+| **Potato** | Late Blight | Potato — Late Blight | 78 |
+| **Corn** | Gray Leaf Spot | Corn — Gray Leaf Spot | 76 |
+| **Wheat** | Leaf Rust | Wheat — Leaf Rust | 75 |
+| **Apple** | Black Rot | Apple — Black Rot | 63 |
+| **Bell Pepper** | Bacterial Spot | Bell Pepper — Bacterial Spot | 53 |
+| **Controls** | Healthy Foliage | Crop — Healthy | 8 |
 
 ---
 
@@ -52,83 +45,82 @@ Full breakdown available in [`outputs/phase1/reports/class_feasibility.csv`](out
 ```
 LeafSentinel/
 ├── configs/
-│   └── phase1.yaml               # Configurable thresholds, paths, perceptual hash parameters
+│   ├── dataset_audit.yaml        # Dataset profiling and validation configuration
+│   └── segmentation.yaml         # Lesion segmentation model & training configuration
 ├── data/
-│   ├── raw/                      # Raw dataset directory (.gitignored)
-│   │   └── plantseg/             # Unmodified PlantSeg dataset
-│   ├── interim/                  # Intermediate staging caches (.gitignored)
-│   └── processed/                # Production model-ready tensors (.gitignored)
+│   └── raw/plantseg/             # Unmodified raw PlantSeg dataset (.gitignored)
 ├── outputs/
-│   └── phase1/
-│       ├── reports/              # JSON summary, statistical CSVs, feasibility & duplicate reports
-│       │   ├── dataset_summary.json
-│       │   ├── dataset_statistics.csv
-│       │   ├── class_feasibility.csv
-│       │   ├── duplicate_candidates.csv
-│       │   ├── validation_errors.csv
-│       │   ├── host_distribution.csv
-│       │   └── disease_distribution.csv
-│       ├── figures/              # Publication-grade Matplotlib distribution plots (300 DPI)
-│       │   ├── host_distribution.png
-│       │   ├── disease_distribution.png
-│       │   ├── split_distribution.png
-│       │   ├── disease_by_split.png
-│       │   ├── mask_ratio_distribution.png
-│       │   └── resolution_distribution.png
-│       └── samples/              # 3-Panel qualitative sample cards (Image | Mask | Overlay)
+│   ├── audit/                    # Discovery summaries, statistics, and duplicate reports (.gitignored)
+│   ├── dataset/                  # Authoritative manifest.csv and exclusions.csv (.gitignored)
+│   ├── figures/                  # Publication-quality distribution plots (.gitignored)
+│   ├── training/                 # Model checkpoints, training history, and loss curves (.gitignored)
+│   └── evaluation/               # Test metrics, per-class metrics, 5-panel predictions (.gitignored)
 ├── src/
-│   ├── __init__.py
-│   └── dataset/
+│   ├── dataset/
+│   │   ├── __init__.py
+│   │   ├── inspect.py            # Dynamic dataset auto-discovery & metadata parsing
+│   │   ├── validate.py           # Incremental stream validation (images & masks)
+│   │   ├── duplicates.py         # Exact (MD5) & Perceptual (dHash) duplicate detection
+│   │   ├── leakage.py            # Two-stage duplicate verification & Union-Find grouping
+│   │   ├── statistics.py         # Statistical profiling & cross-tabulations
+│   │   ├── feasibility.py        # Class feasibility heuristic tier scoring
+│   │   └── visualize.py          # Matplotlib distribution chart & sample card generators
+│   └── segmentation/
 │       ├── __init__.py
-│       ├── inspect.py            # Dynamic dataset auto-discovery & metadata parsing
-│       ├── validate.py           # Incremental, memory-safe stream validation (images & masks)
-│       ├── duplicates.py         # Exact (MD5) & Perceptual (dHash) duplicate & leakage detection
-│       ├── statistics.py         # Statistical distributions & summary aggregation
-│       ├── feasibility.py        # Class feasibility heuristic tier scoring
-│       └── visualize.py          # Pure Matplotlib chart & 3-panel sample generator
+│       ├── model.py              # ResNet18-UNet architecture (14.3M parameters)
+│       ├── dataset.py            # PyTorch Dataset with synchronized spatial transforms
+│       ├── metrics.py            # Dice, IoU, Precision, Recall, FP Area Ratio
+│       ├── train.py              # BCE+Dice loss, AdamW, validation, checkpointing & early stopping
+│       └── evaluate.py           # Test set evaluation & 5-panel qualitative prediction cards
 ├── scripts/
-│   └── run_phase1.py             # Single entrypoint CLI pipeline runner
+│   ├── audit_dataset.py          # End-to-end dataset discovery & audit runner
+│   ├── prepare_dataset.py        # Leakage-free benchmark dataset preparation & manifest generator
+│   ├── train_segmentation.py     # Training runner CLI (with --smoke-test mode)
+│   └── evaluate_segmentation.py  # Test set evaluation runner CLI
 ├── tests/
 │   ├── __init__.py
-│   └── test_phase1.py            # Automated unit and integration test suite
-├── .gitignore                    # Production gitignore (excludes weights, venv, raw data)
-├── requirements.txt              # Project dependencies
-└── README.md                     # Documentation and Phase 1 evidence report
+│   ├── test_dataset_audit.py     # Unit tests for discovery, validation, and duplicates
+│   └── test_segmentation.py      # Unit tests for zero leakage, U-Net forward pass, loss, metrics
+├── .gitignore                    # Excludes weights, virtual env, dataset, and outputs
+├── requirements.txt              # Standard dependencies
+└── README.md
 ```
 
 ---
 
-## 🚀 Quickstart & Reproduction
+## 🚀 Execution Guide
 
 ### 1. Environment Setup
 ```bash
-# Create virtual environment
 python -m venv .venv
-
 # Activate virtual environment
-# Windows:
-.venv\Scripts\activate
-# Linux/macOS:
-source .venv/bin/activate
-
-# Install dependencies
+# Windows: .venv\Scripts\activate | Linux/macOS: source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
 ### 2. Run Test Suite
 ```bash
-python tests/test_phase1.py
+python -m unittest tests/test_dataset_audit.py tests/test_segmentation.py
 ```
 
-### 3. Execute Phase 1 Audit Pipeline
+### 3. Run Dataset Preparation & Manifest Generation
 ```bash
-python scripts/run_phase1.py --data data/raw/plantseg
+python scripts/prepare_dataset.py --config configs/segmentation.yaml
 ```
 
----
+### 4. Run CPU Smoke Test
+```bash
+python scripts/train_segmentation.py --config configs/segmentation.yaml --smoke-test
+```
 
-## 📋 Phase 2 Roadmap
-With Phase 1 complete, the dataset evidence will be reviewed to:
-1. Define the initial multi-class disease scope (prioritizing the 21 Strong and top Usable classes).
-2. Construct a **leakage-free split** that removes cross-partition duplicates flagged in `duplicate_candidates.csv`.
-3. Establish baseline benchmarks for disease classification (ResNet/ConvNeXt/ViT) and semantic/instance segmentation (UNet++/DeepLabV3+/Mask2Former).
+### 5. Run Full Baseline Training
+```bash
+python scripts/train_segmentation.py --config configs/segmentation.yaml
+```
+
+### 6. Evaluate on Test Split
+```bash
+python scripts/evaluate_segmentation.py \
+    --config configs/segmentation.yaml \
+    --checkpoint outputs/training/<run_name>/best_model.pth
+```
