@@ -1,5 +1,5 @@
 # LeafSentinel
-> **Enterprise-Grade Computer Vision System for In-the-Wild Plant Disease Detection, Fine-Grained Lesion Segmentation, Severity Estimation & Crop-Health Analytics.**
+> **Computer Vision System for In-the-Wild Plant Disease Detection, Fine-Grained Lesion Segmentation, Severity Estimation & Crop-Health Analytics.**
 
 ---
 
