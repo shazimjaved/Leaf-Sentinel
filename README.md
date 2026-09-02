@@ -59,7 +59,7 @@ LeafSentinel/
 │   ├── dataset/
 │   │   ├── __init__.py
 │   │   ├── inspect.py            # Dynamic dataset auto-discovery & metadata parsing
-│   │   ├── validate.py           # Incremental stream validation (images & masks)
+│   │   ├── validate.py           # Incremental stream validation 
 │   │   ├── duplicates.py         # Exact (MD5) & Perceptual (dHash) duplicate detection
 │   │   ├── leakage.py            # Two-stage duplicate verification & Union-Find grouping
 │   │   ├── statistics.py         # Statistical profiling & cross-tabulations
