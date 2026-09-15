@@ -1,13 +1,3 @@
-"""CLI runner for LeafSentinel lesion segmentation baseline training.
-
-Usage:
-    # Run rapid CPU smoke test:
-    python scripts/train_segmentation.py --config configs/phase2.yaml --smoke-test
-
-    # Run full baseline training:
-    python scripts/train_segmentation.py --config configs/phase2.yaml
-"""
-
 import argparse
 from datetime import datetime
 import json
