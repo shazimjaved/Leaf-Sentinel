@@ -1,10 +1,3 @@
-"""Dataset discovery, integrity validation, statistical profiling & leakage audit runner for LeafSentinel.
-
-Usage:
-    python scripts/audit_dataset.py --data data/raw/plantseg
-    python scripts/audit_dataset.py --config configs/dataset_audit.yaml
-"""
-
 import argparse
 import json
 import logging
