@@ -30,7 +30,7 @@ def load_yaml_config(path: Path) -> Dict[str, Any]:
 
 def main():
     parser = argparse.ArgumentParser(description="LeafSentinel Lesion Segmentation Training CLI")
-    parser.add_argument("--config", type=str, default="configs/phase2.yaml", help="Path to Phase 2 YAML config")
+    parser.add_argument("--config", type=str, default="configs/segmentation.yaml", help="Path to segmentation YAML config")
     parser.add_argument("--smoke-test", action="store_true", help="Run rapid CPU smoke test (1 epoch, 32 samples)")
     parser.add_argument("--epochs", type=int, default=None, help="Override training epochs")
     parser.add_argument("--batch-size", type=int, default=None, help="Override batch size")

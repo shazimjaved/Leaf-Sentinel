@@ -37,7 +37,7 @@ def load_yaml_config(path: Path) -> Dict[str, Any]:
 
 def main():
     parser = argparse.ArgumentParser(description="LeafSentinel Lesion Segmentation Evaluation CLI")
-    parser.add_argument("--config", type=str, default="configs/phase2.yaml", help="Path to Phase 2 YAML config")
+    parser.add_argument("--config", type=str, default="configs/segmentation.yaml", help="Path to segmentation YAML config")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to trained model checkpoint (.pth)")
     parser.add_argument("--manifest", type=str, default=None, help="Optional override for manifest.csv")
     parser.add_argument("--output", type=str, default=None, help="Optional override for evaluation output directory")
