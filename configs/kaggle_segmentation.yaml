@@ -1,0 +1,88 @@
+dataset:
+  anomalous_masks:
+    action: exclude
+  healthy:
+    enabled: true
+    max_ratio: 0.2
+  image_size: 512
+  root: /kaggle/input/datasets/shazimjaved/leaf-data/plantseg/plantseg
+  selected_classes:
+  - disease: tomato early blight
+    display_name: "Tomato \u2014 Early Blight"
+    plant: Tomato
+  - disease: potato late blight
+    display_name: "Potato \u2014 Late Blight"
+    plant: Potato
+  - disease: apple black rot
+    display_name: "Apple \u2014 Black Rot"
+    plant: Apple
+  - disease: grape downy mildew
+    display_name: "Grape \u2014 Downy Mildew"
+    plant: Grape
+  - disease: corn gray leaf spot
+    display_name: "Corn \u2014 Gray Leaf Spot"
+    plant: Corn
+  - disease: soybean frog eye leaf spot
+    display_name: "Soybean \u2014 Frogeye Leaf Spot"
+    plant: Soybean
+  - disease: bell pepper bacterial spot
+    display_name: "Bell Pepper \u2014 Bacterial Spot"
+    plant: Bell pepper
+  - disease: wheat leaf rust
+    display_name: "Wheat \u2014 Leaf Rust"
+    plant: Wheat
+  - disease: banana black leaf streak
+    display_name: "Banana \u2014 Black Sigatoka"
+    plant: Banana
+  - disease: citrus canker
+    display_name: "Citrus \u2014 Citrus Canker"
+    plant: Citrus
+evaluation:
+  threshold: 0.5
+leakage:
+  exact_duplicates: group
+  near_duplicates:
+    cross_split_action: group
+    dhash_threshold: 6
+    enabled: true
+    secondary_verification: ssim
+    ssim_threshold: 0.85
+loss:
+  bce_weight: 0.5
+  dice_weight: 0.5
+model:
+  encoder: resnet18
+  in_channels: 3
+  name: unet
+  num_classes: 1
+  pretrained: true
+paths:
+  audit_output_dir: /kaggle/working/outputs/audit
+  dataset_dir: /kaggle/working/outputs/dataset
+  evaluation_dir: /kaggle/working/outputs/evaluation
+  figures_dir: /kaggle/working/outputs/figures
+  output_dir: /kaggle/working/outputs
+  raw_data_dir: /kaggle/input/datasets/shazimjaved/leaf-data/plantseg/plantseg
+  training_dir: /kaggle/working/outputs/training
+project:
+  name: LeafSentinel
+  task: lesion_segmentation
+smoke_test:
+  batch_size: 4
+  epochs: 1
+  image_size: 256
+  learning_rate: 0.001
+  max_samples: 32
+split:
+  seed: 42
+  test_ratio: 0.15
+  train_ratio: 0.7
+  val_ratio: 0.15
+training:
+  batch_size: 8
+  early_stopping_patience: 7
+  epochs: 30
+  learning_rate: 0.0001
+  mixed_precision: true
+  num_workers: 0
+  weight_decay: 0.0001

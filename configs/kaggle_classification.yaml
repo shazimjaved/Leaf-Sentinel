@@ -1,0 +1,42 @@
+project:
+  name: LeafSentinel
+  phase: phase3
+
+paths:
+  audit_output_dir: "/kaggle/working/outputs/classification/audit"
+  output_dir: "/kaggle/working/outputs/classification"
+  dataset_dir: "/kaggle/working/outputs/classification/dataset"
+  figures_dir: "/kaggle/working/outputs/classification/figures"
+  training_dir: "/kaggle/working/outputs/classification/training"
+  evaluation_dir: "/kaggle/working/outputs/classification/evaluation"
+
+dataset:
+  root: "/kaggle/input/plantseg" # Ensure this matches Kaggle's dynamic extraction path
+  phase2_manifest: "outputs/dataset/manifest.csv" # Need to ensure this is correct on Kaggle
+  classification_manifest: "/kaggle/working/outputs/classification/dataset/classification_manifest.csv"
+  image_size: 224
+  input_mode: "full_rgb" # Oracle experiment: "lesion_crop_gt"
+  lesion_margin: 0.15
+
+model:
+  name: "efficientnet_b0"
+  pretrained: true
+  num_classes: 10
+
+loss:
+  name: "weighted_cross_entropy"
+  label_smoothing: 0.0
+
+training:
+  epochs: 30
+  batch_size: 64 # Larger for GPU
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  early_stopping_patience: 7
+  num_workers: 4 # Faster IO on Kaggle
+  mixed_precision: true
+  seed: 42
+
+evaluation:
+  primary_metric: "macro_f1"
+  top_k: 2

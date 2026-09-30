@@ -1,0 +1,28 @@
+{
+  "total_samples": 195,
+  "diseased_samples": 194,
+  "healthy_samples": 1,
+  "overall": {
+    "mean_dice": 0.7084553624078065,
+    "median_dice": 0.7711082314497881,
+    "mean_iou": 0.582832513786195,
+    "median_iou": 0.6274826239252256,
+    "mean_precision": 0.7231508654445934,
+    "mean_recall": 0.7917729103219827,
+    "mean_pixel_accuracy": 0.9105076520870894
+  },
+  "diseased_only": {
+    "mean_dice": 0.7121071941727951,
+    "median_dice": 0.7718927086007775,
+    "mean_iou": 0.5858368050943713,
+    "median_iou": 0.6285228742303992,
+    "mean_precision": 0.7268784472252356,
+    "mean_recall": 0.7906995748081785,
+    "mean_pixel_accuracy": 0.9101242576677775
+  },
+  "healthy_only": {
+    "mean_false_positive_area_ratio": 0.01511383056640625,
+    "max_false_positive_area_ratio": 0.01511383056640625,
+    "perfect_clean_leaf_rate": 0.0
+  }
+}

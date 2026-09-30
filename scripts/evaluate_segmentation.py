@@ -1,11 +1,3 @@
-"""CLI runner for LeafSentinel lesion segmentation baseline test evaluation.
-
-Usage:
-    python scripts/evaluate_segmentation.py \
-        --config configs/phase2.yaml \
-        --checkpoint outputs/phase2/training/<run_name>/best_model.pth
-"""
-
 import argparse
 import json
 import logging

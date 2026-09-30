@@ -6,9 +6,10 @@
 ## 📌 Project Overview
 **LeafSentinel** is a computer vision pipeline engineered to detect, segment, and quantify foliar crop diseases from real-world agricultural RGB imagery.
 
-The core pipeline is organized around two foundational milestones:
+The core pipeline is organized around three foundational milestones:
 1. **Dataset Discovery & Leakage Audit**: Non-destructive data profiling, validation, duplicate detection, and leakage-free benchmark split generation.
 2. **Lesion Segmentation Baseline**: Pixel-level disease localization using a U-Net architecture with ImageNet-pretrained ResNet-18 feature extraction.
+3. **Disease Classification**: Robust 10-class pathology classification utilizing an EfficientNet-B0 architecture built on the leakage-free benchmark split.
 
 ---
 
@@ -76,11 +77,15 @@ LeafSentinel/
 │   ├── audit_dataset.py          # End-to-end dataset discovery & audit runner
 │   ├── prepare_dataset.py        # Leakage-free benchmark dataset preparation & manifest generator
 │   ├── train_segmentation.py     # Training runner CLI (with --smoke-test mode)
-│   └── evaluate_segmentation.py  # Test set evaluation runner CLI
+│   ├── evaluate_segmentation.py  # Test set evaluation runner CLI
+│   ├── prepare_classification.py # Classification dataset prep & portable paths manifest generator
+│   ├── train_classifier.py       # Classification training runner CLI (with --smoke-test mode)
+│   └── evaluate_classifier.py    # Classification test set evaluation runner CLI
 ├── tests/
 │   ├── __init__.py
 │   ├── test_dataset_audit.py     # Unit tests for discovery, validation, and duplicates
-│   └── test_segmentation.py      # Unit tests for zero leakage, U-Net forward pass, loss, metrics
+│   ├── test_segmentation.py      # Unit tests for zero leakage, U-Net forward pass, loss, metrics
+│   └── test_classification.py    # Unit tests for classification data leakage invariants & model shape
 ├── .gitignore                    # Excludes weights, virtual env, dataset, and outputs
 ├── requirements.txt              # Standard dependencies
 └── README.md

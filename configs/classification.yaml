@@ -1,0 +1,42 @@
+project:
+  name: LeafSentinel
+  phase: phase3
+
+paths:
+  audit_output_dir: "outputs/classification/audit"
+  output_dir: "outputs/classification"
+  dataset_dir: "outputs/classification/dataset"
+  figures_dir: "outputs/classification/figures"
+  training_dir: "outputs/classification/training"
+  evaluation_dir: "outputs/classification/evaluation"
+
+dataset:
+  root: "data/raw/plantseg"
+  phase2_manifest: "data/outputs/dataset/manifest.csv"
+  classification_manifest: "outputs/classification/dataset/classification_manifest.csv"
+  image_size: 224
+  input_mode: "full_rgb" # Oracle experiment: "lesion_crop_gt"
+  lesion_margin: 0.15
+
+model:
+  name: "efficientnet_b0"
+  pretrained: true
+  num_classes: 10
+
+loss:
+  name: "weighted_cross_entropy"
+  label_smoothing: 0.0
+
+training:
+  epochs: 30
+  batch_size: 16
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  early_stopping_patience: 7
+  num_workers: 2
+  mixed_precision: true
+  seed: 42
+
+evaluation:
+  primary_metric: "macro_f1"
+  top_k: 2
