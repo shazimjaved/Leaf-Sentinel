@@ -130,12 +130,12 @@ class ClassificationDataset(Dataset):
         # Resolve paths dynamically relative to dataset_root
         img_path = self.dataset_root / row["image_relpath"]
         
-        try:
-            image = Image.open(img_path).convert("RGB")
-        except Exception as e:
-            logger.error(f"Failed to load image {img_path}: {e}")
-            # Return dummy on failure to prevent crash, though it shouldn't happen in clean datasets
-            image = Image.new("RGB", (self.image_size, self.image_size))
+        if not img_path.exists():
+            raise FileNotFoundError(
+                f"Classification image not found: {img_path}"
+            )
+
+        image = Image.open(img_path).convert("RGB")
             
         if self.input_mode == "lesion_crop_gt":
             mask_path = self.dataset_root / row["mask_relpath"]

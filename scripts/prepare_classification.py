@@ -36,19 +36,17 @@ logging.basicConfig(
 logger = logging.getLogger("LeafSentinel.Phase3.Prepare")
 
 def get_relative_path(abs_path: str, root_dir: Path) -> str:
-    """Safely convert absolute path from Phase 2 manifest to relative path based on dataset structure."""
-    path_obj = Path(abs_path)
-    # The Phase 2 paths might be absolute on the user's machine. 
-    # We want paths like 'images/train/file.jpg' or 'annotations/val/file.png'
-    # By searching for 'images' or 'annotations', we can extract the relative part.
-    parts = path_obj.parts
-    if 'images' in parts:
-        idx = parts.index('images')
-        return "/".join(parts[idx:])
-    elif 'annotations' in parts:
-        idx = parts.index('annotations')
-        return "/".join(parts[idx:])
-    return path_obj.name
+    """Convert Windows or POSIX Phase 2 paths into PlantSeg-relative paths."""
+    normalized = str(abs_path).replace(chr(92), "/")
+
+    for marker in ("images/", "annotations/"):
+        idx = normalized.find(marker)
+        if idx != -1:
+            return normalized[idx:]
+
+    raise ValueError(
+        f"Could not derive PlantSeg-relative path from: {abs_path}"
+    )
 
 def run_preparation(phase2_manifest_path: Path, output_dir: Path, dataset_root: Path):
     logger.info("================================================================================")

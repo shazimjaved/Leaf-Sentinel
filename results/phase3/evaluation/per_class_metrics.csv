@@ -1,0 +1,11 @@
+class_index,class_name,precision,recall,f1
+0,Apple — Black Rot,0.7777778,0.7,0.7368421
+1,Banana — Black Sigatoka,1.0,0.9411765,0.969697
+2,Bell Pepper — Bacterial Spot,0.85714287,0.75,0.8
+3,Citrus — Citrus Canker,0.9375,0.9375,0.9375
+4,Corn — Gray Leaf Spot,1.0,1.0,1.0
+5,Grape — Downy Mildew,0.96875,0.96875,0.96875
+6,Potato — Late Blight,0.8333333,0.8333333,0.8333333
+7,Soybean — Frogeye Leaf Spot,0.875,0.95454544,0.9130435
+8,Tomato — Early Blight,0.7826087,0.7826087,0.7826087
+9,Wheat — Leaf Rust,0.9166667,1.0,0.95652175

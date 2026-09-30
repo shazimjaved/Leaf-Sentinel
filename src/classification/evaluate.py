@@ -135,7 +135,7 @@ def run_evaluation(config: dict):
         for j in range(cm.shape[1]):
             ax.text(j, i, format(cm[i, j], 'd'),
                     ha="center", va="center",
-                    color="white" if cm[i, j] > cm.max()/2. else="black")
+                    color="white" if cm[i, j] > cm.max()/2. else "black")
                     
     fig.tight_layout()
     fig.savefig(fig_dir / "confusion_matrix.png")
