@@ -10,7 +10,6 @@ from tqdm import tqdm
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 from src.classification.dataset import ClassificationDataset
 from src.classification.model import DiseaseClassifier
