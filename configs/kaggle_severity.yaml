@@ -1,0 +1,23 @@
+# configs/kaggle_severity.yaml
+experiment_name: "Phase4_Severity_Regression_Kaggle"
+
+dataset:
+  severity_manifest: "outputs/severity/dataset/severity_manifest.csv"
+  root: "/kaggle/input/plant-disease-recognition-dataset/Train/Train"
+  image_size: 224
+
+training:
+  batch_size: 64
+  num_workers: 4
+  epochs: 30
+  early_stopping_patience: 7
+  learning_rate: 1.0e-4
+  weight_decay: 1.0e-4
+  mixed_precision: true
+  seed: 42
+
+loss:
+  name: "l1"
+
+paths:
+  training_dir: "/kaggle/working/outputs/severity/training/kaggle_run"

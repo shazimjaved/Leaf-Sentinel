@@ -129,3 +129,7 @@ python scripts/evaluate_segmentation.py \
     --config configs/segmentation.yaml \
     --checkpoint outputs/training/<run_name>/best_model.pth
 ```
+
+## Phase 4: Disease Severity Estimation
+
+**Important Terminology Note:** PlantSeg does not provide true whole-leaf area masks. Therefore, LeafSentinel Phase 4 estimates **Image-Relative Lesion Burden** (lesion area / image area) and not **True Disease Severity** (lesion area / leaf area) to avoid overstating agronomic interpretation.
