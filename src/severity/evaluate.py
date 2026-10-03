@@ -14,27 +14,33 @@ from src.severity.baselines import evaluate_trivial_baseline
 logger = logging.getLogger("LeafSentinel.Phase4.Evaluate")
 
 @torch.no_grad()
-def evaluate_model(model, loader, metrics, device="cpu"):
+def evaluate_model(model, loader, raw_metrics, clipped_metrics, device="cpu"):
     model.eval()
-    metrics.reset()
+    raw_metrics.reset()
+    clipped_metrics.reset()
     
     predictions = []
     
     for images, targets in tqdm(loader, desc="Evaluating"):
         images, targets = images.to(device), targets.to(device)
         preds = model(images)
-        metrics.update(preds, targets)
-        
-        # Save raw predictions and clipped predictions
         preds_clipped = torch.clamp(preds, 0.0, 1.0)
         
+        raw_metrics.update(preds, targets)
+        clipped_metrics.update(preds_clipped, targets)
+        
         for i in range(targets.size(0)):
+            raw_p = preds[i].item()
+            clip_p = preds_clipped[i].item()
+            t = targets[i].item()
             predictions.append({
-                "true_burden": targets[i].item(),
-                "raw_predicted_burden": preds[i].item(),
-                "clipped_predicted_burden": preds_clipped[i].item(),
-                "absolute_error": abs(targets[i].item() - preds_clipped[i].item()),
-                "signed_error": preds_clipped[i].item() - targets[i].item()
+                "true_burden": t,
+                "raw_predicted_burden": raw_p,
+                "clipped_predicted_burden": clip_p,
+                "raw_absolute_error": abs(t - raw_p),
+                "raw_signed_error": raw_p - t,
+                "clipped_absolute_error": abs(t - clip_p),
+                "clipped_signed_error": clip_p - t
             })
             
-    return metrics.compute(), predictions
+    return raw_metrics.compute(), clipped_metrics.compute(), predictions

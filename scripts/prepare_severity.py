@@ -27,15 +27,13 @@ logging.basicConfig(
 logger = logging.getLogger("LeafSentinel.Phase4.Prepare")
 
 def get_relative_path(abs_path: str, root_dir: Path) -> str:
-    path_obj = Path(abs_path)
-    parts = path_obj.parts
-    if 'images' in parts:
-        idx = parts.index('images')
-        return "/".join(parts[idx:])
-    elif 'annotations' in parts:
-        idx = parts.index('annotations')
-        return "/".join(parts[idx:])
-    return path_obj.name
+    normalized = str(abs_path).replace(chr(92), "/")
+    if "images/" in normalized:
+        return "images/" + normalized.split("images/")[-1]
+    elif "annotations/" in normalized:
+        return "annotations/" + normalized.split("annotations/")[-1]
+    else:
+        raise ValueError(f"Neither 'images/' nor 'annotations/' found in path: {abs_path}")
 
 def run_preparation(phase2_manifest_path: Path, output_dir: Path, dataset_root: Path):
     logger.info("================================================================================")

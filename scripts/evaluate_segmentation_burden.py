@@ -16,7 +16,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.segmentation.model import LesionSegmentationModel
+from src.segmentation.model import ResNetUNet
 from src.severity.metrics import get_regression_metrics
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -30,7 +30,7 @@ def evaluate_segmentation_baseline(model, df, data_root, device, metrics_fn):
     
     # Phase 2 transforms
     transform = transforms.Compose([
-        transforms.Resize((224, 224)),
+        transforms.Resize((512, 512)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
@@ -54,9 +54,9 @@ def evaluate_segmentation_baseline(model, df, data_root, device, metrics_fn):
         # Phase 2 evaluation threshold was 0.5
         pred_mask = (probs > 0.5).float()
         
-        # Calculate burden on the 224x224 mask (since aspect-ratio-distorting resize preserves exact area fraction!)
+        # Calculate burden on the 512x512 mask (since aspect-ratio-distorting resize preserves exact area fraction!)
         predicted_pixels = pred_mask.sum().item()
-        total_pixels = 224 * 224
+        total_pixels = 512 * 512
         predicted_burden = predicted_pixels / total_pixels
         
         pred_tensor = torch.tensor([[predicted_burden]], dtype=torch.float32, device=device)
@@ -98,7 +98,7 @@ def main():
     
     # Load Phase 2 model
     logger.info(f"Loading Phase 2 segmentation model from {ckpt_path}")
-    model = LesionSegmentationModel()
+    model = ResNetUNet(pretrained=False)
     ckpt = torch.load(ckpt_path, map_location=device)
     model.load_state_dict(ckpt["model_state_dict"])
     model.to(device)

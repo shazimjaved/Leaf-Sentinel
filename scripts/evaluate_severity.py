@@ -38,7 +38,7 @@ def plot_scatter(predictions_df, out_path):
 
 def plot_residuals(predictions_df, out_path):
     fig, ax = plt.subplots(figsize=(8, 6))
-    ax.scatter(predictions_df["true_burden"], predictions_df["signed_error"], alpha=0.5)
+    ax.scatter(predictions_df["true_burden"], predictions_df["clipped_signed_error"], alpha=0.5)
     ax.axhline(0, color='r', linestyle='--')
     ax.set_xlabel("True Image-Relative Lesion Burden")
     ax.set_ylabel("Signed Error (Predicted - True)")
@@ -107,10 +107,11 @@ def main():
     fig_dir = out_dir / "figures"
     fig_dir.mkdir(parents=True, exist_ok=True)
 
-    metrics_fn = get_regression_metrics(device=device)
+    raw_metrics_fn = get_regression_metrics(device=device)
+    clipped_metrics_fn = get_regression_metrics(device=device)
 
     logger.info(f"Evaluating neural network on {len(ds)} {args.split} samples...")
-    metrics_res, predictions = evaluate_model(model, loader, metrics_fn, device=device)
+    raw_metrics_res, clipped_metrics_res, predictions = evaluate_model(model, loader, raw_metrics_fn, clipped_metrics_fn, device=device)
 
     # Convert predictions to DF and merge metadata
     pred_df = pd.DataFrame(predictions)
@@ -120,12 +121,18 @@ def main():
     pred_df["display_class"] = ds.df["display_class"]
     pred_df["benchmark_split"] = ds.df["benchmark_split"]
 
-    # Calculate per-class metrics
+    # Calculate out-of-range metrics
+    n_total = len(pred_df)
+    below_0 = (pred_df["raw_predicted_burden"] < 0).sum()
+    above_1 = (pred_df["raw_predicted_burden"] > 1).sum()
+    out_of_range = below_0 + above_1
+
+    # Calculate per-class metrics (using clipped errors)
     class_metrics = []
     for cls, group in pred_df.groupby("display_class"):
-        mae = group["absolute_error"].mean()
-        bias = group["signed_error"].mean()
-        rmse = (group["absolute_error"] ** 2).mean() ** 0.5
+        mae = group["clipped_absolute_error"].mean()
+        bias = group["clipped_signed_error"].mean()
+        rmse = (group["clipped_absolute_error"] ** 2).mean() ** 0.5
         class_metrics.append({
             "display_class": cls,
             "mae": mae,
@@ -136,19 +143,31 @@ def main():
     class_df = pd.DataFrame(class_metrics)
 
     # Evaluate trivial baselines using stored metadata
-    train_mean = ckpt.get("train_target_mean", ds.df["mask_area_ratio"].mean()) # fallback if missing
-    train_median = ckpt.get("train_target_median", ds.df["mask_area_ratio"].median())
+    if "train_target_mean" not in ckpt or "train_target_median" not in ckpt:
+        raise ValueError("Missing 'train_target_mean' or 'train_target_median' in checkpoint! Must not fallback to validation set.")
+        
+    train_mean = ckpt["train_target_mean"]
+    train_median = ckpt["train_target_median"]
     
     logger.info("Evaluating trivial baselines...")
-    mean_metrics = evaluate_trivial_baseline(train_mean, loader, metrics_fn, device=device)
-    median_metrics = evaluate_trivial_baseline(train_median, loader, metrics_fn, device=device)
+    trivial_metrics_fn = get_regression_metrics(device=device)
+    mean_metrics = evaluate_trivial_baseline(train_mean, loader, trivial_metrics_fn, device=device)
+    trivial_metrics_fn.reset()
+    median_metrics = evaluate_trivial_baseline(train_median, loader, trivial_metrics_fn, device=device)
 
     # Format global metrics
-    global_metrics = {k: float(v) for k, v in metrics_res.items()}
-    global_metrics["mae_percentage_points"] = global_metrics["mae"] * 100
+    global_raw = {k: float(v) for k, v in raw_metrics_res.items()}
+    global_clipped = {k: float(v) for k, v in clipped_metrics_res.items()}
     
     out_json = {
-        "nn_metrics": global_metrics,
+        "raw_metrics": global_raw,
+        "clipped_metrics": global_clipped,
+        "out_of_range_stats": {
+            "raw_predictions_below_0": int(below_0),
+            "raw_predictions_above_1": int(above_1),
+            "raw_predictions_out_of_range": int(out_of_range),
+            "out_of_range_rate": float(out_of_range / n_total)
+        },
         "mean_baseline_metrics": {k: float(v) for k, v in mean_metrics.items()},
         "median_baseline_metrics": {k: float(v) for k, v in median_metrics.items()}
     }
@@ -157,12 +176,17 @@ def main():
     with open(out_dir / "metrics.json", "w") as f:
         json.dump(out_json, f, indent=4)
 
-    metrics_flat = pd.DataFrame([global_metrics])
+    # For metrics.csv, flatten raw and clipped metrics
+    flat_metrics = {"type": "raw", **global_raw}
+    flat_clipped = {"type": "clipped", **global_clipped}
+    metrics_flat = pd.DataFrame([flat_metrics, flat_clipped])
     metrics_flat.to_csv(out_dir / "metrics.csv", index=False)
+    
     class_df.to_csv(out_dir / "per_class_metrics.csv", index=False)
     
     cols_order = ["image_id", "true_burden", "raw_predicted_burden", "clipped_predicted_burden", 
-                  "absolute_error", "signed_error", "host", "disease", "display_class", "benchmark_split"]
+                  "raw_absolute_error", "raw_signed_error", "clipped_absolute_error", "clipped_signed_error",
+                  "host", "disease", "display_class", "benchmark_split"]
     pred_df[cols_order].to_csv(out_dir / "predictions.csv", index=False)
 
     # Generate figures
@@ -171,7 +195,7 @@ def main():
     plot_per_class_mae(class_df, fig_dir / "per_class_mae.png")
     plot_target_distribution(pred_df, fig_dir / "target_distribution.png")
 
-    logger.info(f"Evaluation complete. NN MAE: {global_metrics['mae']:.4f}")
+    logger.info(f"Evaluation complete. NN Clipped MAE: {global_clipped['mae']:.4f}")
     logger.info(f"Outputs saved to {out_dir}")
 
 if __name__ == "__main__":

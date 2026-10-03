@@ -3,7 +3,7 @@ experiment_name: "Phase4_Severity_Regression_Kaggle"
 
 dataset:
   severity_manifest: "outputs/severity/dataset/severity_manifest.csv"
-  root: "/kaggle/input/plant-disease-recognition-dataset/Train/Train"
+  root: "/kaggle/input/datasets/shazimjaved/leaf-data/plantseg/plantseg"
   image_size: 224
 
 training:

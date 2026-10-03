@@ -67,11 +67,13 @@ class ImageRelativeBurdenDataset(Dataset):
         
         img_path = self.dataset_root / row["image_relpath"]
         
+        if not img_path.exists():
+            raise FileNotFoundError(f"Image not found: {img_path}")
+            
         try:
             image = Image.open(img_path).convert("RGB")
         except Exception as e:
-            logger.error(f"Failed to load image {img_path}: {e}")
-            image = Image.new("RGB", (self.image_size, self.image_size))
+            raise FileNotFoundError(f"Failed to load image {img_path}: {e}")
             
         if self.transform:
             image = self.transform(image)
