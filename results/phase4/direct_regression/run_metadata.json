@@ -1,0 +1,35 @@
+{
+    "epoch": 29,
+    "best_val_mae": 0.09807958453893661,
+    "config": {
+        "experiment_name": "Phase4_Severity_Regression_Kaggle",
+        "dataset": {
+            "severity_manifest": "outputs/severity/dataset/severity_manifest.csv",
+            "root": "/kaggle/input/datasets/shazimjaved/leaf-data/plantseg/plantseg",
+            "image_size": 224
+        },
+        "training": {
+            "batch_size": 64,
+            "num_workers": 4,
+            "epochs": 30,
+            "early_stopping_patience": 7,
+            "learning_rate": 0.0001,
+            "weight_decay": 0.0001,
+            "mixed_precision": true,
+            "seed": 42
+        },
+        "loss": {
+            "name": "l1"
+        },
+        "paths": {
+            "training_dir": "/kaggle/working/outputs/severity/training/kaggle_run"
+        }
+    },
+    "input_mode": "full_rgb",
+    "image_size": 224,
+    "loss": "l1",
+    "seed": 42,
+    "target_definition": "mask_area_ratio",
+    "train_target_mean": 0.19482681356790335,
+    "train_target_median": 0.1116583333333333
+}

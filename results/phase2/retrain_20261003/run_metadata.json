@@ -1,0 +1,14 @@
+{
+  "project": "LeafSentinel",
+  "phase": "phase2",
+  "timestamp": "2026-10-03T11:00:45.674871",
+  "is_smoke_test": false,
+  "device": "cuda",
+  "gpu_name": "Tesla T4",
+  "epochs_completed": 36,
+  "best_epoch": 29,
+  "best_val_dice": 0.7317364954948425,
+  "total_training_time_sec": 1908.0,
+  "best_checkpoint": "/kaggle/working/outputs/training/run_20261003_102855/best_model.pth",
+  "history_csv": "/kaggle/working/outputs/training/run_20261003_102855/training_history.csv"
+}
