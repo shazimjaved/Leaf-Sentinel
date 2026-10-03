@@ -1,0 +1,13 @@
+# LeafSentinel Phase 5 — Inference Configuration (Kaggle)
+# Paths specific to the Kaggle environment.
+
+class_map: "outputs/classification/dataset/class_to_idx.json"
+
+checkpoints:
+  classifier: null  # Phase 3 checkpoint must be added to the artifact dataset
+  segmenter: "/kaggle/input/leafsentinel-model-artifacts/phase2_segmentation/best_model.pth"
+  regressor: "/kaggle/input/leafsentinel-model-artifacts/phase4_severity/direct_regression/best_model.pth"
+
+device: null  # Auto-detect (Kaggle GPU kernels provide CUDA)
+
+classification_abstain_threshold: null

@@ -3,16 +3,21 @@ import torch.nn as nn
 from torchvision.models import efficientnet_b0, EfficientNet_B0_Weights
 
 class BurdenRegressor(nn.Module):
-    def __init__(self):
+    def __init__(self, pretrained: bool = True):
         """
         LeafSentinel Phase 4 Lesion Burden Regressor based on EfficientNet-B0.
         
         Outputs a single continuous scalar value for Image-Relative Lesion Burden.
         Uses a raw linear output (no sigmoid).
+        
+        Args:
+            pretrained (bool): If True, load ImageNet pretrained weights.
+                Use False when loading a trained checkpoint to avoid
+                unnecessary weight downloads.
         """
         super().__init__()
         
-        weights = EfficientNet_B0_Weights.DEFAULT
+        weights = EfficientNet_B0_Weights.DEFAULT if pretrained else None
         self.backbone = efficientnet_b0(weights=weights)
         
         # Replace the final classifier head with a single output node

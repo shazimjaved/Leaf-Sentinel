@@ -3,18 +3,21 @@ import torch.nn as nn
 from torchvision.models import efficientnet_b0, EfficientNet_B0_Weights
 
 class DiseaseClassifier(nn.Module):
-    def __init__(self, num_classes: int = 10):
+    def __init__(self, num_classes: int = 10, pretrained: bool = True):
         """
         LeafSentinel Phase 3 Disease Classifier based on EfficientNet-B0.
         
         Args:
             num_classes (int): Number of disease classes to predict.
+            pretrained (bool): If True, load ImageNet pretrained weights.
+                Use False when loading a trained checkpoint to avoid
+                unnecessary weight downloads.
         """
         super().__init__()
         self.num_classes = num_classes
         
         # Use modern torchvision weights API instead of deprecated pretrained=True
-        weights = EfficientNet_B0_Weights.DEFAULT
+        weights = EfficientNet_B0_Weights.DEFAULT if pretrained else None
         self.backbone = efficientnet_b0(weights=weights)
         
         # Replace the final classifier head

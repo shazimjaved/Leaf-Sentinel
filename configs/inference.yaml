@@ -1,0 +1,22 @@
+# LeafSentinel Phase 5 — Inference Configuration (Local)
+# Paths come from CLI arguments or this config. CLI arguments take precedence.
+
+# Class mapping file (authoritative Phase 3 class-to-index mapping)
+class_map: "outputs/classification/dataset/class_to_idx.json"
+
+# Model checkpoints
+# Set these to the local paths where your checkpoints are stored.
+# CLI arguments --classifier-checkpoint and --segmentation-checkpoint
+# override these values.
+checkpoints:
+  classifier: null    # Phase 3 classifier checkpoint (required)
+  segmenter: null     # Phase 2 segmentation checkpoint (required)
+  regressor: null     # Phase 4 direct regressor (optional, disabled by default)
+
+# Device selection (null = auto-detect: cuda if available, else cpu)
+device: null
+
+# Classification abstain threshold
+# null = no hard abstention; confidence diagnostics are reported only.
+# Any future threshold must be derived from validation data, never test data.
+classification_abstain_threshold: null
