@@ -140,7 +140,14 @@ def run_training(config: dict, smoke_test: bool = False):
     best_val_f1 = 0.0
     epochs_no_improve = 0
     
-    out_dir = Path(config["paths"]["training_dir"])
+    import datetime
+    base_dir = Path(config["paths"]["training_dir"])
+    if smoke_test:
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        out_dir = base_dir / f"smoke_test_{timestamp}"
+        logger.info(f"SMOKE TEST MODE: Output directory set to {out_dir}")
+    else:
+        out_dir = base_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     
     history = []
