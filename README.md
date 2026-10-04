@@ -1,135 +1,360 @@
 # LeafSentinel
-> **Computer Vision System for In-the-Wild Plant Disease Detection, Fine-Grained Lesion Segmentation, Severity Estimation & Crop-Health Analytics.**
+
+**Leakage-aware plant disease classification, lesion segmentation, and image-relative lesion burden estimation from RGB leaf imagery.**
+
+LeafSentinel is a multi-stage computer vision project built on the PlantSeg dataset. The project currently covers dataset auditing, leakage-controlled benchmark construction, lesion segmentation, 10-class disease classification, image-relative lesion burden estimation, and a unified multi-model inference system.
+
+> **Current status:** Phases 1–5 complete. Real-world / video inference and deployment are planned as later phases.
+
+<p align="center">
+  <img src="docs/assets/pipeline_overview.png" alt="LeafSentinel Phase 5 pipeline" width="95%">
+</p>
 
 ---
 
-## 📌 Project Overview
-**LeafSentinel** is a computer vision pipeline engineered to detect, segment, and quantify foliar crop diseases from real-world agricultural RGB imagery.
+## Project Scope
 
-The core pipeline is organized around three foundational milestones:
-1. **Dataset Discovery & Leakage Audit**: Non-destructive data profiling, validation, duplicate detection, and leakage-free benchmark split generation.
-2. **Lesion Segmentation Baseline**: Pixel-level disease localization using a U-Net architecture with ImageNet-pretrained ResNet-18 feature extraction.
-3. **Disease Classification**: Robust 10-class pathology classification utilizing an EfficientNet-B0 architecture built on the leakage-free benchmark split.
+LeafSentinel answers three separate questions from a leaf image:
 
----
+- **WHAT disease is predicted?** — EfficientNet-B0 disease classifier.
+- **WHERE are the visible lesions?** — ResNet18-U-Net lesion segmenter.
+- **HOW MUCH of the image is lesion area?** — segmentation-derived image-relative lesion burden.
 
-## 🔬 Benchmark Dataset & Leakage-Free Preparation
+The integrated Phase 5 system combines those outputs into one structured inference result with disease probabilities, lesion mask, burden estimate, and confidence diagnostics.
 
-### 📊 Dataset Profiling & Verification
-* **Source Dataset**: PlantSeg (7,774 high-resolution leaf images across 34 crop hosts and 115 pathology categories).
-* **Two-Stage Duplicate Verification**:
-  * **Stage 1 (Exact)**: MD5 byte-exact matching automatically groups identical files.
-  * **Stage 2 (Near-Duplicates)**: 256-bit Difference Hash (dHash) candidates ($\text{dist} \le 6$) undergo secondary Structural Similarity Index (SSIM $\ge 0.85$) verification.
-* **Zero-Leakage Stratified Splitting**: Disjoint Set Union (Union-Find) connected-component grouping guarantees that **no duplicate group spans across training, validation, and test splits**.
-
-### 🎯 Benchmark Class Selection
-The initial lesion segmentation benchmark targets 10 high-priority agricultural crops (1,304 total verified samples):
-
-| Crop Host | Disease Pathology | Display Label | Samples |
-|---|---|---|---|
-| **Citrus** | Citrus Canker | Citrus — Citrus Canker | 323 |
-| **Grape** | Downy Mildew | Grape — Downy Mildew | 211 |
-| **Soybean** | Frogeye Leaf Spot | Soybean — Frogeye Leaf Spot | 153 |
-| **Tomato** | Early Blight | Tomato — Early Blight | 153 |
-| **Banana** | Black Sigatoka | Banana — Black Sigatoka | 114 |
-| **Potato** | Late Blight | Potato — Late Blight | 78 |
-| **Corn** | Gray Leaf Spot | Corn — Gray Leaf Spot | 76 |
-| **Wheat** | Leaf Rust | Wheat — Leaf Rust | 75 |
-| **Apple** | Black Rot | Apple — Black Rot | 63 |
-| **Bell Pepper** | Bacterial Spot | Bell Pepper — Bacterial Spot | 53 |
-| **Controls** | Healthy Foliage | Crop — Healthy | 8 |
+**Important terminology:** PlantSeg does not provide whole-leaf masks. Therefore, LeafSentinel reports **Image-Relative Lesion Burden = lesion pixels / total image pixels**. It does **not** claim true whole-leaf disease severity or percentage of leaf area affected.
 
 ---
 
-## 📁 Repository Structure
+## Final Phase 5 Benchmark
 
+The integrated benchmark uses **194 diseased held-out test images across 10 disease classes**. Healthy-vs-diseased classification is not validated and healthy controls are excluded from the primary Phase 5 benchmark.
+
+<p align="center">
+  <img src="docs/assets/phase5_benchmark_summary.png" alt="Phase 5 benchmark summary" width="92%">
+</p>
+
+| Task | Metric | Result |
+|---|---:|---:|
+| Disease classification | Accuracy | **90.72%** |
+| Disease classification | Macro F1 | **88.98%** |
+| Disease classification | Top-2 Accuracy | **96.39%** |
+| Lesion segmentation | Mean Dice | **0.7503** |
+| Lesion segmentation | Mean IoU | **0.6279** |
+| Lesion segmentation | Precision | **0.7721** |
+| Lesion segmentation | Recall | **0.7894** |
+| Image-relative lesion burden | MAE | **4.88 percentage points** |
+| Image-relative lesion burden | RMSE | **0.0864** |
+| Image-relative lesion burden | R² | **0.8291** |
+| Image-relative lesion burden | Pearson | **0.9126** |
+| Image-relative lesion burden | Spearman | **0.9041** |
+
+---
+
+## Benchmark Dataset & Leakage Control
+
+The source PlantSeg release contains **7,774 images**, spanning **34 plant hosts** and **115 pathology classes**.
+
+The benchmark preparation pipeline includes:
+
+- exact duplicate detection using MD5,
+- perceptual near-duplicate candidate detection using dHash,
+- secondary SSIM verification,
+- Union-Find duplicate grouping,
+- group-aware split assignment so a duplicate group cannot span train / validation / test.
+
+The selected benchmark contains **1,304 samples** across 10 disease classes plus 8 healthy controls.
+
+| Crop | Disease | Samples |
+|---|---|---:|
+| Citrus | Citrus Canker | 323 |
+| Grape | Downy Mildew | 211 |
+| Soybean | Frogeye Leaf Spot | 153 |
+| Tomato | Early Blight | 153 |
+| Banana | Black Sigatoka | 114 |
+| Potato | Late Blight | 78 |
+| Corn | Gray Leaf Spot | 76 |
+| Wheat | Leaf Rust | 75 |
+| Apple | Black Rot | 63 |
+| Bell Pepper | Bacterial Spot | 53 |
+| Healthy controls | Mixed healthy foliage | 8 |
+
+For disease classification, the 8 healthy controls are excluded because they are not sufficient to support a validated 11th class.
+
+---
+
+## Phase 2 — Lesion Segmentation
+
+**Model:** ResNet18-U-Net  
+**Input:** 512×512 RGB  
+**Loss:** 0.5 BCEWithLogits + 0.5 Dice  
+**Threshold:** 0.5
+
+The recovered Phase 2 checkpoint was selected at **epoch 29**.
+
+On the 194 diseased test images used by Phase 5:
+
+| Metric | Result |
+|---|---:|
+| Mean Dice | **0.7503** |
+| Median Dice | **0.7904** |
+| Mean IoU | **0.6279** |
+| Mean Precision | **0.7721** |
+| Mean Recall | **0.7894** |
+
+---
+
+## Phase 3 — Disease Classification
+
+**Model:** EfficientNet-B0  
+**Input:** full RGB image, PadToSquare, 224×224  
+**Classes:** 10 disease classes  
+**Loss:** weighted cross-entropy
+
+The verified Phase 3 checkpoint was selected at **epoch 19** with validation Macro F1 **0.9105**.
+
+Held-out test results:
+
+| Metric | Result |
+|---|---:|
+| Accuracy | **0.9072** |
+| Balanced Accuracy | **0.8868** |
+| Macro F1 | **0.8898** |
+| Weighted F1 | **0.9065** |
+| Top-2 Accuracy | **0.9639** |
+| Mean Confidence | **0.9125** |
+
+<p align="center">
+  <img src="docs/assets/classification_confusion_matrix.png" alt="Disease classification confusion matrix" width="78%">
+</p>
+
+---
+
+## Phase 4 — Image-Relative Lesion Burden
+
+Phase 4 compared two strategies:
+
+1. **Direct RGB regression** with EfficientNet-B0.
+2. **Segmentation-derived burden** from the Phase 2 binary lesion mask.
+
+The segmentation-derived approach was clearly stronger and became the primary production method.
+
+| Method | Test MAE | RMSE | R² | Pearson |
+|---|---:|---:|---:|---:|
+| Direct RGB regression | 0.1040 | 0.1483 | 0.4966 | 0.7353 |
+| Segmentation-derived burden | **0.0513** | **0.0942** | **0.7970** | **0.8938** |
+
+The direct regressor remains available only as an optional diagnostic. The Phase 5 system does not average the two estimates.
+
+---
+
+## Phase 5 — Integrated Multi-Model Inference
+
+The final inference pipeline keeps classifier and segmenter preprocessing separate:
+
+```text
+RGB image
+├── EfficientNet-B0
+│   └── disease label + confidence + top-2 + margin + normalized entropy
+│
+└── ResNet18-U-Net
+    └── lesion probability map
+        └── binary mask @ 0.5
+            └── image-relative lesion burden
 ```
-LeafSentinel/
+
+The segmenter runs once per image. The same predicted mask is reused for visualization and burden calculation.
+
+The system does not apply an arbitrary hard confidence threshold by default. Confidence, margin, and entropy are reported as diagnostics.
+
+### Integrated Findings
+
+Across the 194-image Phase 5 benchmark:
+
+- **176 / 194** disease predictions were correct.
+- Mean burden absolute error was **4.78 pp** when classification was correct and **5.86 pp** when classification was wrong.
+- Mean segmentation Dice was **0.7556** when classification was correct and **0.6985** when classification was wrong.
+- Classifier confidence was moderately associated with correctness (**Pearson = 0.571**).
+- Classifier confidence was essentially unrelated to burden absolute error (**Pearson = -0.014**).
+
+These are descriptive relationships and should not be interpreted as causal.
+
+<p align="center">
+  <img src="docs/assets/burden_scatter.png" alt="Predicted versus true image-relative lesion burden" width="72%">
+</p>
+
+<p align="center">
+  <img src="docs/assets/per_class_performance.png" alt="Per-class Phase 5 performance" width="96%">
+</p>
+
+<p align="center">
+  <img src="docs/assets/integrated_diagnostics.png" alt="Integrated Phase 5 diagnostics" width="84%">
+</p>
+
+---
+
+## Supported Disease Classes
+
+| Index | Class |
+|---:|---|
+| 0 | Apple — Black Rot |
+| 1 | Banana — Black Sigatoka |
+| 2 | Bell Pepper — Bacterial Spot |
+| 3 | Citrus — Citrus Canker |
+| 4 | Corn — Gray Leaf Spot |
+| 5 | Grape — Downy Mildew |
+| 6 | Potato — Late Blight |
+| 7 | Soybean — Frogeye Leaf Spot |
+| 8 | Tomato — Early Blight |
+| 9 | Wheat — Leaf Rust |
+
+---
+
+## Repository Structure
+
+```text
+Leaf-Sentinel/
 ├── configs/
-│   ├── dataset_audit.yaml        # Dataset profiling and validation configuration
-│   └── segmentation.yaml         # Lesion segmentation model & training configuration
-├── data/
-│   └── raw/plantseg/             # Unmodified raw PlantSeg dataset (.gitignored)
-├── outputs/
-│   ├── audit/                    # Discovery summaries, statistics, and duplicate reports (.gitignored)
-│   ├── dataset/                  # Authoritative manifest.csv and exclusions.csv (.gitignored)
-│   ├── figures/                  # Publication-quality distribution plots (.gitignored)
-│   ├── training/                 # Model checkpoints, training history, and loss curves (.gitignored)
-│   └── evaluation/               # Test metrics, per-class metrics, 5-panel predictions (.gitignored)
+│   ├── segmentation.yaml
+│   ├── classification.yaml
+│   ├── severity.yaml
+│   ├── inference.yaml
+│   └── kaggle_*.yaml
+│
 ├── src/
-│   ├── dataset/
-│   │   ├── __init__.py
-│   │   ├── inspect.py            # Dynamic dataset auto-discovery & metadata parsing
-│   │   ├── validate.py           # Incremental stream validation 
-│   │   ├── duplicates.py         # Exact (MD5) & Perceptual (dHash) duplicate detection
-│   │   ├── leakage.py            # Two-stage duplicate verification & Union-Find grouping
-│   │   ├── statistics.py         # Statistical profiling & cross-tabulations
-│   │   ├── feasibility.py        # Class feasibility heuristic tier scoring
-│   │   └── visualize.py          # Matplotlib distribution chart & sample card generators
-│   └── segmentation/
-│       ├── __init__.py
-│       ├── model.py              # ResNet18-UNet architecture (14.3M parameters)
-│       ├── dataset.py            # PyTorch Dataset with synchronized spatial transforms
-│       ├── metrics.py            # Dice, IoU, Precision, Recall, FP Area Ratio
-│       ├── train.py              # BCE+Dice loss, AdamW, validation, checkpointing & early stopping
-│       └── evaluate.py           # Test set evaluation & 5-panel qualitative prediction cards
+│   ├── dataset/          # audit, validation, leakage control
+│   ├── segmentation/     # Phase 2 ResNet18-U-Net
+│   ├── classification/   # Phase 3 EfficientNet-B0
+│   ├── severity/         # Phase 4 burden regression / evaluation
+│   └── inference/        # Phase 5 integrated inference engine
+│
 ├── scripts/
-│   ├── audit_dataset.py          # End-to-end dataset discovery & audit runner
-│   ├── prepare_dataset.py        # Leakage-free benchmark dataset preparation & manifest generator
-│   ├── train_segmentation.py     # Training runner CLI (with --smoke-test mode)
-│   ├── evaluate_segmentation.py  # Test set evaluation runner CLI
-│   ├── prepare_classification.py # Classification dataset prep & portable paths manifest generator
-│   ├── train_classifier.py       # Classification training runner CLI (with --smoke-test mode)
-│   └── evaluate_classifier.py    # Classification test set evaluation runner CLI
+│   ├── audit_dataset.py
+│   ├── prepare_dataset.py
+│   ├── train_segmentation.py
+│   ├── evaluate_segmentation.py
+│   ├── prepare_classification.py
+│   ├── train_classifier.py
+│   ├── evaluate_classifier.py
+│   ├── evaluate_segmentation_burden.py
+│   ├── run_inference.py
+│   ├── run_batch_inference.py
+│   └── generate_project_figures.py
+│
+├── results/
+│   ├── phase2/
+│   ├── phase3/
+│   ├── phase4/
+│   └── phase5/
+│
+├── docs/
+│   └── assets/           # README / portfolio figures
+│
 ├── tests/
-│   ├── __init__.py
-│   ├── test_dataset_audit.py     # Unit tests for discovery, validation, and duplicates
-│   ├── test_segmentation.py      # Unit tests for zero leakage, U-Net forward pass, loss, metrics
-│   └── test_classification.py    # Unit tests for classification data leakage invariants & model shape
-├── .gitignore                    # Excludes weights, virtual env, dataset, and outputs
-├── requirements.txt              # Standard dependencies
 └── README.md
 ```
 
+Large model checkpoints are intentionally kept out of Git and versioned separately in the Kaggle artifact dataset:
+
+```text
+shazimjaved/leafsentinel-model-artifacts
+```
+
 ---
 
-## 🚀 Execution Guide
+## Generate Portfolio Figures
 
-### 1. Environment Setup
+The README figures are generated directly from tracked Phase 5 result files, so no raw dataset or model checkpoint is required.
+
 ```bash
-python -m venv .venv
-# Activate virtual environment
-# Windows: .venv\Scripts\activate | Linux/macOS: source .venv/bin/activate
-pip install -r requirements.txt
+python scripts/generate_project_figures.py
 ```
 
-### 2. Run Test Suite
-```bash
-python -m unittest tests/test_dataset_audit.py tests/test_segmentation.py
+This creates:
+
+```text
+docs/assets/
+├── pipeline_overview.png
+├── phase5_benchmark_summary.png
+├── classification_confusion_matrix.png
+├── burden_scatter.png
+├── per_class_performance.png
+└── integrated_diagnostics.png
 ```
 
-### 3. Run Dataset Preparation & Manifest Generation
+---
+
+## Single-Image Inference
+
 ```bash
-python scripts/prepare_dataset.py --config configs/segmentation.yaml
+python scripts/run_inference.py \
+  --config configs/inference.yaml \
+  --image path/to/leaf.jpg \
+  --classifier-checkpoint path/to/phase3/best_model.pth \
+  --segmentation-checkpoint path/to/phase2/best_model.pth \
+  --class-map path/to/class_to_idx.json \
+  --output-dir outputs/inference/sample
 ```
 
-### 4. Run CPU Smoke Test
-```bash
-python scripts/train_segmentation.py --config configs/segmentation.yaml --smoke-test
+Outputs:
+
+```text
+result.json
+mask.png
+overlay.png
+diagnostic_card.png
 ```
 
-### 5. Run Full Baseline Training
+---
+
+## Batch Inference
+
 ```bash
-python scripts/train_segmentation.py --config configs/segmentation.yaml
+python scripts/run_batch_inference.py \
+  --config configs/inference.yaml \
+  --input-dir path/to/images \
+  --classifier-checkpoint path/to/phase3/best_model.pth \
+  --segmentation-checkpoint path/to/phase2/best_model.pth \
+  --class-map path/to/class_to_idx.json \
+  --output-dir outputs/inference/batch
 ```
 
-### 6. Evaluate on Test Split
-```bash
-python scripts/evaluate_segmentation.py \
-    --config configs/segmentation.yaml \
-    --checkpoint outputs/training/<run_name>/best_model.pth
-```
+Batch inference writes `predictions.csv`, `predictions.json`, and optional diagnostic visualizations while isolating per-image failures.
 
-## Phase 4: Disease Severity Estimation
+---
 
-**Important Terminology Note:** PlantSeg does not provide true whole-leaf area masks. Therefore, LeafSentinel Phase 4 estimates **Image-Relative Lesion Burden** (lesion area / image area) and not **True Disease Severity** (lesion area / leaf area) to avoid overstating agronomic interpretation.
+## Current Limitations
+
+- The current classifier supports **10 disease classes**, not arbitrary plant diseases.
+- **Healthy-vs-diseased classification is not validated** because healthy-control support is too small.
+- Image-relative lesion burden is **not equivalent to true whole-leaf disease severity**.
+- Phase 5 results are benchmark results from PlantSeg; real field/video robustness has not yet been established.
+- No single combined “overall AI accuracy” score is reported because classification, segmentation, and burden estimation are distinct tasks.
+
+---
+
+## Roadmap
+
+| Phase | Status | Scope |
+|---|---|---|
+| Phase 1 | ✅ Complete | Dataset audit, duplicates, leakage control |
+| Phase 2 | ✅ Complete | Lesion segmentation |
+| Phase 3 | ✅ Complete | 10-class disease classification |
+| Phase 4 | ✅ Complete | Image-relative lesion burden |
+| Phase 5 | ✅ Complete | Integrated multi-model inference |
+| Phase 6 | ⏳ Next | Field / video / real-world inference |
+| Phase 7 | ⏳ Planned | Deployment and portfolio application |
+
+---
+
+## Reproducibility Notes
+
+The benchmark split is group-aware and leakage-controlled. Phase 5 uses the same held-out diseased test images for classifier, segmentation, and burden analysis so cross-task diagnostics are sample-aligned.
+
+Tracked benchmark outputs live under `results/`. Large trained checkpoints are stored separately to avoid bloating Git history.
+
+---
+
+## License / Dataset Note
+
+PlantSeg images retain their original source licenses. Refer to the dataset metadata and source records for image-level licensing information before redistributing dataset content.
