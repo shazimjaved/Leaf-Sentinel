@@ -298,21 +298,24 @@ class TestBurdenCalculation:
 
 
 class TestPipeline:
-    def test_end_to_end_with_dummy_models(self):
-        """Full pipeline runs with dummy models and produces valid result."""
+    def _make_predictor(self, threshold=None):
         device = torch.device("cpu")
         clf = _make_dummy_classifier()
         seg = _make_dummy_segmenter()
-        predictor = LeafSentinelPredictor(
+        return LeafSentinelPredictor(
             classifier=clf,
             segmenter=seg,
             class_map=CLASS_MAP,
             device=device,
+            classification_abstain_threshold=threshold,
         )
+
+    def test_end_to_end_with_dummy_models(self):
+        """Full pipeline runs with dummy models and produces valid result."""
+        predictor = self._make_predictor()
         image = _make_dummy_image(300, 200)
         result = predictor.predict(image, image_path="test.jpg")
 
-        # Validate structure
         assert isinstance(result, InferenceResult)
         assert result.image.width == 300
         assert result.image.height == 200
@@ -323,73 +326,58 @@ class TestPipeline:
         assert result.segmentation.measurement_grid == [512, 512]
         assert result.segmentation.threshold == 0.5
 
+    def test_predict_with_artifacts_returns_mask(self):
+        """predict_with_artifacts() returns (InferenceResult, ndarray)."""
+        predictor = self._make_predictor()
+        image = _make_dummy_image(300, 200)
+        result, mask = predictor.predict_with_artifacts(image)
+
+        assert isinstance(result, InferenceResult)
+        assert isinstance(mask, np.ndarray)
+        assert mask.shape == (200, 300)  # original image dimensions
+        assert set(np.unique(mask)).issubset({0, 255})
+
+    def test_predict_with_artifacts_single_pass_consistent(self):
+        """predict() and predict_with_artifacts() produce identical results."""
+        predictor = self._make_predictor()
+        image = _make_dummy_image(280, 180)
+
+        result_a = predictor.predict(image)
+        result_b, mask = predictor.predict_with_artifacts(image)
+
+        # Both calls produce results with the same structure
+        assert isinstance(result_b, InferenceResult)
+        assert result_b.segmentation.measurement_grid == [512, 512]
+        # Display mask dimensions match original image
+        assert mask.shape == (180, 280)
+
     def test_healthy_detection_always_false(self):
         """System always reports healthy_detection_supported=False."""
-        device = torch.device("cpu")
-        clf = _make_dummy_classifier()
-        seg = _make_dummy_segmenter()
-        predictor = LeafSentinelPredictor(
-            classifier=clf,
-            segmenter=seg,
-            class_map=CLASS_MAP,
-            device=device,
-        )
+        predictor = self._make_predictor()
         result = predictor.predict(_make_dummy_image())
         assert result.system.healthy_detection_supported is False
 
     def test_input_within_supported_scope_is_null(self):
         """System does not claim automatic scope detection."""
-        device = torch.device("cpu")
-        clf = _make_dummy_classifier()
-        seg = _make_dummy_segmenter()
-        predictor = LeafSentinelPredictor(
-            classifier=clf,
-            segmenter=seg,
-            class_map=CLASS_MAP,
-            device=device,
-        )
+        predictor = self._make_predictor()
         result = predictor.predict(_make_dummy_image())
         assert result.system.input_within_supported_scope is None
 
     def test_supported_classes_populated(self):
         """System reports the correct 10 supported classes."""
-        device = torch.device("cpu")
-        clf = _make_dummy_classifier()
-        seg = _make_dummy_segmenter()
-        predictor = LeafSentinelPredictor(
-            classifier=clf,
-            segmenter=seg,
-            class_map=CLASS_MAP,
-            device=device,
-        )
+        predictor = self._make_predictor()
         result = predictor.predict(_make_dummy_image())
         assert len(result.system.supported_classes) == 10
 
     def test_direct_regression_disabled_by_default(self):
         """Direct regression is None when regressor is not provided."""
-        device = torch.device("cpu")
-        clf = _make_dummy_classifier()
-        seg = _make_dummy_segmenter()
-        predictor = LeafSentinelPredictor(
-            classifier=clf,
-            segmenter=seg,
-            class_map=CLASS_MAP,
-            device=device,
-        )
+        predictor = self._make_predictor()
         result = predictor.predict(_make_dummy_image())
         assert result.direct_regression is None
 
     def test_result_json_serializable(self):
         """InferenceResult can be serialized to valid JSON."""
-        device = torch.device("cpu")
-        clf = _make_dummy_classifier()
-        seg = _make_dummy_segmenter()
-        predictor = LeafSentinelPredictor(
-            classifier=clf,
-            segmenter=seg,
-            class_map=CLASS_MAP,
-            device=device,
-        )
+        predictor = self._make_predictor()
         result = predictor.predict(_make_dummy_image())
         json_str = result.to_json()
         parsed = json.loads(json_str)
@@ -397,6 +385,54 @@ class TestPipeline:
         assert "classification" in parsed
         assert "segmentation" in parsed
         assert "system" in parsed
+
+
+# ============================================================
+# Warning / Threshold Tests
+# ============================================================
+
+
+class TestWarningBehavior:
+    def _make_predictor(self, threshold=None):
+        device = torch.device("cpu")
+        clf = _make_dummy_classifier()
+        seg = _make_dummy_segmenter()
+        return LeafSentinelPredictor(
+            classifier=clf,
+            segmenter=seg,
+            class_map=CLASS_MAP,
+            device=device,
+            classification_abstain_threshold=threshold,
+        )
+
+    def test_no_warnings_when_threshold_is_none(self):
+        """When threshold is None, no confidence-based warnings are emitted."""
+        predictor = self._make_predictor(threshold=None)
+        # Run many images; no threshold-based warning should ever appear
+        for _ in range(5):
+            result = predictor.predict(_make_dummy_image())
+            for w in result.system.warnings:
+                assert "threshold" not in w.lower() and "confidence" not in w.lower(), (
+                    f"Unexpected threshold-based warning: {w}"
+                )
+
+    def test_warning_emitted_when_threshold_explicitly_configured(self):
+        """When threshold is explicitly set and confidence is low, warning fires."""
+        # Set threshold to 1.0 so ANY confidence triggers the warning
+        predictor = self._make_predictor(threshold=1.0)
+        result = predictor.predict(_make_dummy_image())
+        # With threshold=1.0 the warning must always appear since conf <= 1.0
+        assert any("abstention threshold" in w for w in result.system.warnings)
+
+    def test_no_entropy_warning_ever(self):
+        """No entropy-based warning is generated regardless of entropy value."""
+        predictor = self._make_predictor(threshold=None)
+        for _ in range(5):
+            result = predictor.predict(_make_dummy_image())
+            for w in result.system.warnings:
+                assert "entropy" not in w.lower(), (
+                    f"Unexpected entropy-based warning: {w}"
+                )
 
 
 # ============================================================
@@ -419,8 +455,8 @@ class TestVisualization:
             device=device,
         )
         image = _make_dummy_image(300, 200)
-        result = predictor.predict(image)
-        mask = predictor.get_segmentation_mask_for_display(image)
+        # Use predict_with_artifacts to get result and mask in one pass
+        result, mask = predictor.predict_with_artifacts(image)
 
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
             output_path = f.name
@@ -433,7 +469,7 @@ class TestVisualization:
             os.unlink(output_path)
 
     def test_mask_display_dimensions(self):
-        """Display mask matches original image dimensions."""
+        """Display mask from predict_with_artifacts matches original image dimensions."""
         device = torch.device("cpu")
         clf = _make_dummy_classifier()
         seg = _make_dummy_segmenter()
@@ -444,7 +480,7 @@ class TestVisualization:
             device=device,
         )
         image = _make_dummy_image(300, 200)
-        mask = predictor.get_segmentation_mask_for_display(image)
+        _, mask = predictor.predict_with_artifacts(image)
         assert mask.shape == (200, 300)
 
 

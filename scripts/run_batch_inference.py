@@ -161,7 +161,10 @@ def main():
         logger.info(f"[{idx}/{len(image_files)}] Processing: {img_path.name}")
         try:
             image = Image.open(img_path).convert("RGB")
-            result = predictor.predict(image, image_path=str(img_path))
+            # Single forward pass returns result and display mask together
+            result, mask_display = predictor.predict_with_artifacts(
+                image, image_path=str(img_path)
+            )
 
             clf = result.classification
             seg = result.segmentation
@@ -183,13 +186,12 @@ def main():
             csv_rows.append(row)
             results_json.append(result.to_dict())
 
-            # Generate visualizations
+            # Generate visualizations using the mask from the same forward pass
             if not args.skip_visualizations:
                 stem = img_path.stem
-                mask = predictor.get_segmentation_mask_for_display(image)
                 generate_diagnostic_card(
                     image=image,
-                    mask=mask,
+                    mask=mask_display,
                     result=result,
                     output_path=str(vis_dir / f"{stem}_diagnostic.png"),
                 )

@@ -9,7 +9,7 @@ per image.
 
 import logging
 import math
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -70,6 +70,9 @@ class LeafSentinelPredictor:
         class_map: Mapping of class name -> integer index.
         idx_to_class: Reverse mapping of integer index -> class name.
         device: Computation device (cpu or cuda).
+        classification_abstain_threshold: If not None, a top-1 confidence
+            value below which a warning is emitted. Must be derived from
+            validation data. Defaults to None (no automatic warning).
     """
 
     def __init__(
@@ -98,17 +101,70 @@ class LeafSentinelPredictor:
         self.supported_classes = sorted(class_map.keys(), key=lambda c: class_map[c])
         self.num_classes = len(class_map)
 
+    def _run_segmentation(
+        self, image: Image.Image
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Run a single segmentation forward pass.
+
+        Returns:
+            Tuple of (binary_mask_512, seg_probs_512) — both CPU tensors,
+            shape (512, 512).
+        """
+        seg_tensor = self.seg_transform(image).unsqueeze(0).to(self.device)
+        seg_logits = self.segmenter(seg_tensor)
+        seg_probs = torch.sigmoid(seg_logits).squeeze(0).squeeze(0).cpu()
+        binary_mask = (seg_probs >= SEGMENTATION_THRESHOLD)
+        return binary_mask, seg_probs
+
+    def _mask_to_display(
+        self, binary_mask_512: torch.Tensor, orig_w: int, orig_h: int
+    ) -> np.ndarray:
+        """Resize 512x512 binary mask to original image dimensions for display.
+
+        The numeric burden is NOT recomputed here — this is purely for
+        visualization. Values in the returned array are 0 or 255.
+        """
+        mask_np = binary_mask_512.numpy().astype(np.uint8) * 255
+        mask_pil = Image.fromarray(mask_np)
+        mask_pil = mask_pil.resize((orig_w, orig_h), Image.NEAREST)
+        return np.array(mask_pil)
+
     @torch.inference_mode()
     def predict(self, image: Image.Image, image_path: str = "") -> InferenceResult:
         """Run the full inference pipeline on a single RGB image.
+
+        Performs exactly one forward pass through each model.
 
         Args:
             image: PIL Image in RGB mode.
             image_path: Original file path (for metadata only).
 
         Returns:
-            InferenceResult containing classification, segmentation, and
-            system diagnostics.
+            InferenceResult. Does not include the display mask array;
+            use predict_with_artifacts() when visualization is also needed.
+        """
+        result, _ = self.predict_with_artifacts(image, image_path=image_path)
+        return result
+
+    @torch.inference_mode()
+    def predict_with_artifacts(
+        self, image: Image.Image, image_path: str = ""
+    ) -> Tuple[InferenceResult, np.ndarray]:
+        """Run the full inference pipeline and return result + display mask.
+
+        Performs exactly one segmentation forward pass. The display mask
+        (resized to original image dimensions) is returned alongside the
+        InferenceResult so callers never need a second segmentation call.
+
+        Args:
+            image: PIL Image in RGB mode.
+            image_path: Original file path (for metadata only).
+
+        Returns:
+            Tuple of:
+                - InferenceResult (JSON-serializable, does not embed mask array)
+                - display_mask: numpy uint8 array (H, W), values 0 or 255,
+                  at original image dimensions. For visualization only.
         """
         width, height = image.size
 
@@ -117,15 +173,12 @@ class LeafSentinelPredictor:
         logits = self.classifier(clf_tensor)
         probs = torch.softmax(logits, dim=1).squeeze(0)
 
-        # Top-2 extraction
         top2_values, top2_indices = torch.topk(probs, k=2)
-
         top1_idx = top2_indices[0].item()
         top1_conf = top2_values[0].item()
         top2_idx = top2_indices[1].item()
         top2_conf = top2_values[1].item()
         margin = top1_conf - top2_conf
-
         normalized_entropy = _compute_normalized_entropy(probs, self.num_classes)
 
         classification = ClassificationResult(
@@ -148,13 +201,10 @@ class LeafSentinelPredictor:
             normalized_entropy=round(normalized_entropy, 6),
         )
 
-        # ---- Segmentation (Phase 2) ----
-        seg_tensor = self.seg_transform(image).unsqueeze(0).to(self.device)
-        seg_logits = self.segmenter(seg_tensor)
-        seg_probs = torch.sigmoid(seg_logits).squeeze(0).squeeze(0)  # (512, 512)
+        # ---- Segmentation (Phase 2) — exactly ONE forward pass ----
+        binary_mask_512, seg_probs_512 = self._run_segmentation(image)
 
-        binary_mask = (seg_probs >= SEGMENTATION_THRESHOLD).float()
-        lesion_pixels = int(binary_mask.sum().item())
+        lesion_pixels = int(binary_mask_512.sum().item())
         total_pixels = SEGMENTATION_GRID_SIZE * SEGMENTATION_GRID_SIZE
         burden = lesion_pixels / total_pixels
 
@@ -164,22 +214,24 @@ class LeafSentinelPredictor:
             total_pixels=total_pixels,
             image_relative_lesion_burden=round(burden, 6),
             burden_percent=round(burden * 100, 4),
-            mean_probability=round(seg_probs.mean().item(), 6),
-            max_probability=round(seg_probs.max().item(), 6),
+            mean_probability=round(seg_probs_512.mean().item(), 6),
+            max_probability=round(seg_probs_512.max().item(), 6),
             measurement_grid=[SEGMENTATION_GRID_SIZE, SEGMENTATION_GRID_SIZE],
         )
 
         # ---- System warnings ----
-        warnings = []
-        if top1_conf < 0.5:
+        # Warnings are ONLY generated when classification_abstain_threshold
+        # is explicitly configured (not None). No hard-coded numeric cutoffs
+        # are applied. No entropy threshold exists. input_within_supported_scope
+        # remains null — the pipeline cannot verify domain membership.
+        warnings: List[str] = []
+        if (
+            self.classification_abstain_threshold is not None
+            and top1_conf < self.classification_abstain_threshold
+        ):
             warnings.append(
-                "Low classification confidence (<0.5). "
-                "Input may be outside supported disease set."
-            )
-        if normalized_entropy > 0.8:
-            warnings.append(
-                "High predictive entropy (>0.8). "
-                "Model is uncertain across multiple classes."
+                "Classification confidence is below the configured "
+                f"abstention threshold ({self.classification_abstain_threshold:.4f})."
             )
 
         system = SystemInfo(
@@ -194,20 +246,24 @@ class LeafSentinelPredictor:
             reg_tensor = self.reg_transform(image).unsqueeze(0).to(self.device)
             reg_output = self.regressor(reg_tensor)
             reg_burden = torch.clamp(reg_output, 0.0, 1.0).squeeze().item()
-
             direct_regression = DirectRegressionDiagnostic(
                 direct_regression_burden=round(reg_burden, 6),
                 segmentation_burden=round(burden, 6),
                 absolute_disagreement=round(abs(burden - reg_burden), 6),
             )
 
-        return InferenceResult(
+        result = InferenceResult(
             image=ImageInfo(path=image_path, width=width, height=height),
             classification=classification,
             segmentation=segmentation,
             system=system,
             direct_regression=direct_regression,
         )
+
+        # Build display mask at original dimensions — visualization only
+        display_mask = self._mask_to_display(binary_mask_512, width, height)
+
+        return result, display_mask
 
     def predict_from_path(self, image_path: str) -> InferenceResult:
         """Load an image from disk and run full inference.
@@ -229,49 +285,24 @@ class LeafSentinelPredictor:
         image = Image.open(p).convert("RGB")
         return self.predict(image, image_path=str(p))
 
-    def get_segmentation_mask_for_display(
-        self, image: Image.Image
-    ) -> np.ndarray:
-        """Get the binary segmentation mask resized to original image dimensions.
-
-        Used for visualization only. The numeric burden is always computed
-        on the validated 512x512 grid.
+    def predict_from_path_with_artifacts(
+        self, image_path: str
+    ) -> Tuple[InferenceResult, np.ndarray]:
+        """Load an image from disk and run inference, returning result + mask.
 
         Args:
-            image: Original PIL Image.
+            image_path: Path to an image file.
 
         Returns:
-            Binary mask as numpy array of shape (H, W) with values 0 or 255.
+            Tuple of (InferenceResult, display_mask).
+
+        Raises:
+            FileNotFoundError: If the image does not exist.
         """
-        with torch.inference_mode():
-            seg_tensor = self.seg_transform(image).unsqueeze(0).to(self.device)
-            seg_logits = self.segmenter(seg_tensor)
-            seg_probs = torch.sigmoid(seg_logits).squeeze(0).squeeze(0)
-            binary_mask_512 = (seg_probs >= SEGMENTATION_THRESHOLD).cpu().numpy()
+        from pathlib import Path
 
-        # Resize mask back to original dimensions for display
-        w, h = image.size
-        mask_pil = Image.fromarray((binary_mask_512 * 255).astype(np.uint8))
-        mask_pil = mask_pil.resize((w, h), Image.NEAREST)
-        return np.array(mask_pil)
-
-    def get_probability_map_for_display(
-        self, image: Image.Image
-    ) -> np.ndarray:
-        """Get the segmentation probability map resized to original dimensions.
-
-        Args:
-            image: Original PIL Image.
-
-        Returns:
-            Probability map as float32 numpy array of shape (H, W) in [0, 1].
-        """
-        with torch.inference_mode():
-            seg_tensor = self.seg_transform(image).unsqueeze(0).to(self.device)
-            seg_logits = self.segmenter(seg_tensor)
-            seg_probs = torch.sigmoid(seg_logits).squeeze(0).squeeze(0).cpu().numpy()
-
-        w, h = image.size
-        prob_pil = Image.fromarray(seg_probs.astype(np.float32))
-        prob_pil = prob_pil.resize((w, h), Image.BILINEAR)
-        return np.array(prob_pil)
+        p = Path(image_path)
+        if not p.exists():
+            raise FileNotFoundError(f"Image not found: {p}")
+        image = Image.open(p).convert("RGB")
+        return self.predict_with_artifacts(image, image_path=str(p))

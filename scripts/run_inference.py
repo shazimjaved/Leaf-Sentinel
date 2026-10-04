@@ -136,8 +136,10 @@ def main():
     image = Image.open(image_path).convert("RGB")
     logger.info(f"Loaded image: {image_path} ({image.size[0]}x{image.size[1]})")
 
-    # Run inference
-    result = predictor.predict(image, image_path=str(image_path))
+    # Run inference — single forward pass through each model
+    result, mask_display = predictor.predict_with_artifacts(
+        image, image_path=str(image_path)
+    )
 
     # Prepare output directory
     out_dir = Path(args.output_dir)
@@ -149,7 +151,7 @@ def main():
     logger.info(f"Saved result.json")
 
     # Save mask and overlay at original image dimensions
-    mask_display = predictor.get_segmentation_mask_for_display(image)
+    # mask_display was produced during the same forward pass — no re-inference
     save_mask(mask_display, str(out_dir / "mask.png"))
     save_overlay(image, mask_display, str(out_dir / "overlay.png"))
 
