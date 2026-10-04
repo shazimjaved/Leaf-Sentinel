@@ -1,0 +1,50 @@
+{
+  "scope": {
+    "test_samples": 194,
+    "classes": 10,
+    "healthy_samples_included": false,
+    "healthy_detection_supported": false,
+    "burden_definition": "predicted lesion pixels / total image pixels on 512x512 grid"
+  },
+  "classification": {
+    "accuracy": 0.9072164948453608,
+    "balanced_accuracy": 0.8867913954119198,
+    "macro_f1": 0.8898296321336939,
+    "macro_precision": 0.8948779330572808,
+    "macro_recall": 0.8867913954119198,
+    "weighted_f1": 0.9065049752044019,
+    "top2_accuracy": 0.9639175257731959,
+    "mean_confidence": 0.9125431438082272,
+    "median_confidence": 0.9753008186817169
+  },
+  "segmentation": {
+    "mean_dice": 0.7502815255328253,
+    "median_dice": 0.7903561434633701,
+    "mean_iou": 0.6278968304871894,
+    "median_iou": 0.6533845953666668,
+    "mean_precision": 0.772148140371301,
+    "mean_recall": 0.7894027967649105
+  },
+  "image_relative_lesion_burden": {
+    "mae": 0.04882887229399312,
+    "mae_percentage_points": 4.882887229399311,
+    "rmse": 0.08641168416990547,
+    "r2": 0.8291292040538567,
+    "pearson": 0.9125735893367283,
+    "bias": -0.011808852771748568,
+    "median_absolute_error": 0.02169572615757446,
+    "spearman": 0.9040906429463657
+  },
+  "integrated": {
+    "n_samples": 194,
+    "classification_correct_n": 176,
+    "classification_wrong_n": 18,
+    "mean_burden_ae_when_classification_correct": 0.0478337951567484,
+    "mean_burden_ae_when_classification_wrong": 0.05855851541371916,
+    "mean_segmentation_dice_when_classification_correct": 0.7555790896159461,
+    "mean_segmentation_dice_when_classification_wrong": 0.6984831211645341,
+    "confidence_vs_correctness_pearson": 0.571296229842103,
+    "confidence_vs_burden_absolute_error_pearson": -0.013735160541528818,
+    "classifier_confidence_vs_predicted_burden_pearson": 0.12690480266127374
+  }
+}
