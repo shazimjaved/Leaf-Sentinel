@@ -1,38 +1,16 @@
 # LeafSentinel
 
-**Leakage-aware plant disease classification, lesion segmentation, and image-relative lesion burden estimation from RGB leaf imagery.**
+**A leakage-aware computer vision system for plant disease recognition, lesion segmentation, and image-relative lesion burden estimation from RGB leaf images.**
 
-LeafSentinel is a multi-stage computer vision project built on the PlantSeg dataset. The project currently covers dataset auditing, leakage-controlled benchmark construction, lesion segmentation, 10-class disease classification, image-relative lesion burden estimation, and a unified multi-model inference system.
-
-> **Current status:** Phases 1–5 complete. Real-world / video inference and deployment are planned as later phases.
+LeafSentinel combines three complementary capabilities in one inference pipeline: disease classification, lesion localization, and lesion-area quantification. The system is built on a carefully audited subset of PlantSeg with duplicate-aware splitting to reduce train/test leakage.
 
 <p align="center">
-  <img src="docs/assets/pipeline_overview.png" alt="LeafSentinel Phase 5 pipeline" width="95%">
+  <img src="docs/assets/system_overview.png" alt="LeafSentinel system overview" width="95%">
 </p>
 
----
+## Key Results
 
-## Project Scope
-
-LeafSentinel answers three separate questions from a leaf image:
-
-- **WHAT disease is predicted?** — EfficientNet-B0 disease classifier.
-- **WHERE are the visible lesions?** — ResNet18-U-Net lesion segmenter.
-- **HOW MUCH of the image is lesion area?** — segmentation-derived image-relative lesion burden.
-
-The integrated Phase 5 system combines those outputs into one structured inference result with disease probabilities, lesion mask, burden estimate, and confidence diagnostics.
-
-**Important terminology:** PlantSeg does not provide whole-leaf masks. Therefore, LeafSentinel reports **Image-Relative Lesion Burden = lesion pixels / total image pixels**. It does **not** claim true whole-leaf disease severity or percentage of leaf area affected.
-
----
-
-## Final Phase 5 Benchmark
-
-The integrated benchmark uses **194 diseased held-out test images across 10 disease classes**. Healthy-vs-diseased classification is not validated and healthy controls are excluded from the primary Phase 5 benchmark.
-
-<p align="center">
-  <img src="docs/assets/phase5_benchmark_summary.png" alt="Phase 5 benchmark summary" width="92%">
-</p>
+Evaluation on **194 diseased held-out test images across 10 disease classes** produced:
 
 | Task | Metric | Result |
 |---|---:|---:|
@@ -49,21 +27,36 @@ The integrated benchmark uses **194 diseased held-out test images across 10 dise
 | Image-relative lesion burden | Pearson | **0.9126** |
 | Image-relative lesion burden | Spearman | **0.9041** |
 
----
+<p align="center">
+  <img src="docs/assets/benchmark_summary.png" alt="LeafSentinel benchmark summary" width="92%">
+</p>
 
-## Benchmark Dataset & Leakage Control
+## What the System Does
 
-The source PlantSeg release contains **7,774 images**, spanning **34 plant hosts** and **115 pathology classes**.
+Given a single RGB leaf image, LeafSentinel produces:
 
-The benchmark preparation pipeline includes:
+- a predicted disease class,
+- Top-1 and Top-2 confidence scores,
+- a lesion probability map,
+- a binary lesion mask,
+- image-relative lesion burden,
+- confidence diagnostics such as margin and normalized entropy.
 
-- exact duplicate detection using MD5,
-- perceptual near-duplicate candidate detection using dHash,
-- secondary SSIM verification,
-- Union-Find duplicate grouping,
-- group-aware split assignment so a duplicate group cannot span train / validation / test.
+The classifier and segmenter use separate preprocessing pipelines so each model receives the same input representation used during training.
 
-The selected benchmark contains **1,304 samples** across 10 disease classes plus 8 healthy controls.
+## Dataset Integrity and Benchmark Design
+
+The source PlantSeg release contains **7,774 images**, representing **34 plant hosts** and **115 pathology categories**.
+
+To reduce leakage risk, the data preparation pipeline performs:
+
+- MD5-based exact duplicate detection,
+- dHash-based near-duplicate candidate discovery,
+- SSIM verification for candidate pairs,
+- Union-Find grouping of connected duplicate samples,
+- group-aware train/validation/test assignment.
+
+The selected benchmark contains **1,304 samples** covering 10 disease classes plus 8 healthy controls.
 
 | Crop | Disease | Samples |
 |---|---|---:|
@@ -79,41 +72,16 @@ The selected benchmark contains **1,304 samples** across 10 disease classes plus
 | Bell Pepper | Bacterial Spot | 53 |
 | Healthy controls | Mixed healthy foliage | 8 |
 
-For disease classification, the 8 healthy controls are excluded because they are not sufficient to support a validated 11th class.
+Healthy controls are not treated as a validated classification class because the available sample count is too small to support a meaningful healthy-vs-diseased benchmark.
 
----
-
-## Phase 2 — Lesion Segmentation
-
-**Model:** ResNet18-U-Net  
-**Input:** 512×512 RGB  
-**Loss:** 0.5 BCEWithLogits + 0.5 Dice  
-**Threshold:** 0.5
-
-The recovered Phase 2 checkpoint was selected at **epoch 29**.
-
-On the 194 diseased test images used by Phase 5:
-
-| Metric | Result |
-|---|---:|
-| Mean Dice | **0.7503** |
-| Median Dice | **0.7904** |
-| Mean IoU | **0.6279** |
-| Mean Precision | **0.7721** |
-| Mean Recall | **0.7894** |
-
----
-
-## Phase 3 — Disease Classification
+## Disease Classification
 
 **Model:** EfficientNet-B0  
 **Input:** full RGB image, PadToSquare, 224×224  
 **Classes:** 10 disease classes  
 **Loss:** weighted cross-entropy
 
-The verified Phase 3 checkpoint was selected at **epoch 19** with validation Macro F1 **0.9105**.
-
-Held-out test results:
+Held-out performance:
 
 | Metric | Result |
 |---|---:|
@@ -128,29 +96,50 @@ Held-out test results:
   <img src="docs/assets/classification_confusion_matrix.png" alt="Disease classification confusion matrix" width="78%">
 </p>
 
----
+## Lesion Segmentation
 
-## Phase 4 — Image-Relative Lesion Burden
+**Model:** ResNet18-U-Net  
+**Input:** 512×512 RGB  
+**Loss:** 0.5 BCEWithLogits + 0.5 Dice  
+**Decision threshold:** 0.5
 
-Phase 4 compared two strategies:
+On the 194 diseased held-out images:
 
-1. **Direct RGB regression** with EfficientNet-B0.
-2. **Segmentation-derived burden** from the Phase 2 binary lesion mask.
+| Metric | Result |
+|---|---:|
+| Mean Dice | **0.7503** |
+| Median Dice | **0.7904** |
+| Mean IoU | **0.6279** |
+| Mean Precision | **0.7721** |
+| Mean Recall | **0.7894** |
 
-The segmentation-derived approach was clearly stronger and became the primary production method.
+## Image-Relative Lesion Burden
+
+PlantSeg does not provide whole-leaf masks, so this project does **not** claim true disease severity.
+
+The reported quantity is:
+
+```text
+Image-Relative Lesion Burden
+= predicted lesion pixels / total image pixels
+```
+
+Two approaches were evaluated:
 
 | Method | Test MAE | RMSE | R² | Pearson |
 |---|---:|---:|---:|---:|
 | Direct RGB regression | 0.1040 | 0.1483 | 0.4966 | 0.7353 |
 | Segmentation-derived burden | **0.0513** | **0.0942** | **0.7970** | **0.8938** |
 
-The direct regressor remains available only as an optional diagnostic. The Phase 5 system does not average the two estimates.
+The segmentation-derived method is used as the primary burden estimate because it is substantially more accurate and spatially interpretable.
 
----
+<p align="center">
+  <img src="docs/assets/burden_scatter.png" alt="Predicted versus true image-relative lesion burden" width="72%">
+</p>
 
-## Phase 5 — Integrated Multi-Model Inference
+## Integrated Inference
 
-The final inference pipeline keeps classifier and segmenter preprocessing separate:
+The production inference path is deliberately modular:
 
 ```text
 RGB image
@@ -159,39 +148,33 @@ RGB image
 │
 └── ResNet18-U-Net
     └── lesion probability map
-        └── binary mask @ 0.5
+        └── binary mask
             └── image-relative lesion burden
 ```
 
-The segmenter runs once per image. The same predicted mask is reused for visualization and burden calculation.
+The segmenter runs once per image, and the same mask is reused for visualization and burden measurement.
 
-The system does not apply an arbitrary hard confidence threshold by default. Confidence, margin, and entropy are reported as diagnostics.
+No arbitrary confidence threshold is applied by default. Confidence, margin, and entropy are reported as diagnostics rather than being presented as proof of image validity or healthy status.
 
-### Integrated Findings
+## Cross-Task Findings
 
-Across the 194-image Phase 5 benchmark:
+Across the held-out benchmark:
 
-- **176 / 194** disease predictions were correct.
-- Mean burden absolute error was **4.78 pp** when classification was correct and **5.86 pp** when classification was wrong.
+- **176 of 194** disease predictions were correct.
+- Mean burden error was **4.78 percentage points** when classification was correct and **5.86 percentage points** when classification was wrong.
 - Mean segmentation Dice was **0.7556** when classification was correct and **0.6985** when classification was wrong.
-- Classifier confidence was moderately associated with correctness (**Pearson = 0.571**).
-- Classifier confidence was essentially unrelated to burden absolute error (**Pearson = -0.014**).
+- Classification confidence was moderately associated with classification correctness (**Pearson = 0.571**).
+- Classification confidence was essentially unrelated to burden absolute error (**Pearson = -0.014**).
 
-These are descriptive relationships and should not be interpreted as causal.
+These are descriptive associations only and do not imply causal relationships between the tasks.
 
 <p align="center">
-  <img src="docs/assets/burden_scatter.png" alt="Predicted versus true image-relative lesion burden" width="72%">
+  <img src="docs/assets/per_class_performance.png" alt="Per-class performance" width="96%">
 </p>
 
 <p align="center">
-  <img src="docs/assets/per_class_performance.png" alt="Per-class Phase 5 performance" width="96%">
+  <img src="docs/assets/cross_task_diagnostics.png" alt="Cross-task error analysis" width="84%">
 </p>
-
-<p align="center">
-  <img src="docs/assets/integrated_diagnostics.png" alt="Integrated Phase 5 diagnostics" width="84%">
-</p>
-
----
 
 ## Supported Disease Classes
 
@@ -208,81 +191,50 @@ These are descriptive relationships and should not be interpreted as causal.
 | 8 | Tomato — Early Blight |
 | 9 | Wheat — Leaf Rust |
 
----
-
 ## Repository Structure
 
 ```text
 Leaf-Sentinel/
 ├── configs/
-│   ├── segmentation.yaml
-│   ├── classification.yaml
-│   ├── severity.yaml
-│   ├── inference.yaml
-│   └── kaggle_*.yaml
-│
 ├── src/
-│   ├── dataset/          # audit, validation, leakage control
-│   ├── segmentation/     # Phase 2 ResNet18-U-Net
-│   ├── classification/   # Phase 3 EfficientNet-B0
-│   ├── severity/         # Phase 4 burden regression / evaluation
-│   └── inference/        # Phase 5 integrated inference engine
-│
+│   ├── dataset/
+│   ├── segmentation/
+│   ├── classification/
+│   ├── severity/
+│   └── inference/
 ├── scripts/
-│   ├── audit_dataset.py
-│   ├── prepare_dataset.py
-│   ├── train_segmentation.py
-│   ├── evaluate_segmentation.py
-│   ├── prepare_classification.py
-│   ├── train_classifier.py
-│   ├── evaluate_classifier.py
-│   ├── evaluate_segmentation_burden.py
-│   ├── run_inference.py
-│   ├── run_batch_inference.py
-│   └── generate_project_figures.py
-│
 ├── results/
-│   ├── phase2/
-│   ├── phase3/
-│   ├── phase4/
-│   └── phase5/
-│
 ├── docs/
-│   └── assets/           # README / portfolio figures
-│
+│   └── assets/
 ├── tests/
 └── README.md
 ```
 
-Large model checkpoints are intentionally kept out of Git and versioned separately in the Kaggle artifact dataset:
+Large trained checkpoints are intentionally kept out of Git history and stored separately in the project artifact dataset:
 
 ```text
 shazimjaved/leafsentinel-model-artifacts
 ```
 
----
+## Generate Project Figures
 
-## Generate Portfolio Figures
-
-The README figures are generated directly from tracked Phase 5 result files, so no raw dataset or model checkpoint is required.
+The public-facing figures are generated from the tracked benchmark result files:
 
 ```bash
 python scripts/generate_project_figures.py
 ```
 
-This creates:
+Generated files:
 
 ```text
 docs/assets/
-├── pipeline_overview.png
-├── phase5_benchmark_summary.png
+├── system_overview.png
+├── benchmark_summary.png
 ├── classification_confusion_matrix.png
 ├── burden_scatter.png
 ├── per_class_performance.png
-└── integrated_diagnostics.png
+└── cross_task_diagnostics.png
 ```
-
----
 
 ## Single-Image Inference
 
@@ -290,22 +242,13 @@ docs/assets/
 python scripts/run_inference.py \
   --config configs/inference.yaml \
   --image path/to/leaf.jpg \
-  --classifier-checkpoint path/to/phase3/best_model.pth \
-  --segmentation-checkpoint path/to/phase2/best_model.pth \
+  --classifier-checkpoint path/to/classifier.pth \
+  --segmentation-checkpoint path/to/segmenter.pth \
   --class-map path/to/class_to_idx.json \
   --output-dir outputs/inference/sample
 ```
 
-Outputs:
-
-```text
-result.json
-mask.png
-overlay.png
-diagnostic_card.png
-```
-
----
+The command produces structured JSON output plus lesion-mask and overlay visualizations.
 
 ## Batch Inference
 
@@ -313,48 +256,30 @@ diagnostic_card.png
 python scripts/run_batch_inference.py \
   --config configs/inference.yaml \
   --input-dir path/to/images \
-  --classifier-checkpoint path/to/phase3/best_model.pth \
-  --segmentation-checkpoint path/to/phase2/best_model.pth \
+  --classifier-checkpoint path/to/classifier.pth \
+  --segmentation-checkpoint path/to/segmenter.pth \
   --class-map path/to/class_to_idx.json \
   --output-dir outputs/inference/batch
 ```
 
-Batch inference writes `predictions.csv`, `predictions.json`, and optional diagnostic visualizations while isolating per-image failures.
+## Limitations
 
----
+- The classifier is limited to the 10 supported disease classes.
+- Healthy-vs-diseased classification is not validated.
+- Image-relative lesion burden is not the same as percentage of total leaf area affected.
+- Current benchmark results come from PlantSeg; robustness on uncontrolled field imagery and video has not yet been established.
+- Classification, segmentation, and burden estimation are separate tasks, so no single combined “overall AI accuracy” is reported.
 
-## Current Limitations
+## Next Steps
 
-- The current classifier supports **10 disease classes**, not arbitrary plant diseases.
-- **Healthy-vs-diseased classification is not validated** because healthy-control support is too small.
-- Image-relative lesion burden is **not equivalent to true whole-leaf disease severity**.
-- Phase 5 results are benchmark results from PlantSeg; real field/video robustness has not yet been established.
-- No single combined “overall AI accuracy” score is reported because classification, segmentation, and burden estimation are distinct tasks.
+Planned work includes real-world image evaluation, video inference, and a lightweight deployment interface.
 
----
+## Reproducibility
 
-## Roadmap
+The benchmark split is duplicate-aware and leakage-controlled. Classification, segmentation, and burden metrics are evaluated on aligned held-out samples so cross-task analysis is directly comparable.
 
-| Phase | Status | Scope |
-|---|---|---|
-| Phase 1 | ✅ Complete | Dataset audit, duplicates, leakage control |
-| Phase 2 | ✅ Complete | Lesion segmentation |
-| Phase 3 | ✅ Complete | 10-class disease classification |
-| Phase 4 | ✅ Complete | Image-relative lesion burden |
-| Phase 5 | ✅ Complete | Integrated multi-model inference |
-| Phase 6 | ⏳ Next | Field / video / real-world inference |
-| Phase 7 | ⏳ Planned | Deployment and portfolio application |
+Tracked metrics and predictions live under `results/`. Large model weights remain outside Git history in the project artifact dataset.
 
----
+## Dataset Note
 
-## Reproducibility Notes
-
-The benchmark split is group-aware and leakage-controlled. Phase 5 uses the same held-out diseased test images for classifier, segmentation, and burden analysis so cross-task diagnostics are sample-aligned.
-
-Tracked benchmark outputs live under `results/`. Large trained checkpoints are stored separately to avoid bloating Git history.
-
----
-
-## License / Dataset Note
-
-PlantSeg images retain their original source licenses. Refer to the dataset metadata and source records for image-level licensing information before redistributing dataset content.
+PlantSeg images retain their original source licenses. Consult the dataset metadata and source records before redistributing image content.
