@@ -1,9 +1,3 @@
-"""Phase 4 Severity Target Feasibility Audit.
-
-This script performs a rigorous data-driven audit of the existing PlantSeg dataset
-to determine if true disease severity is scientifically calculable.
-"""
-
 import json
 import logging
 from pathlib import Path
