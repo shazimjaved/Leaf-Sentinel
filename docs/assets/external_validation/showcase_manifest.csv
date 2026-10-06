@@ -1,0 +1,6 @@
+category,name,true_class,predicted_class,classification_correct,confidence,burden_percent,original_file,diagnostic_file
+success,corn_gray_leaf_spot,Corn — Gray Leaf Spot,Corn — Gray Leaf Spot,True,0.999474,20.99,docs/assets/external_validation/success/corn_gray_leaf_spot_original.jpg,docs/assets/external_validation/success/corn_gray_leaf_spot_diagnostic.png
+success,tomato_early_blight,Tomato — Early Blight,Tomato — Early Blight,True,0.999552,6.4857,docs/assets/external_validation/success/tomato_early_blight_original.jpg,docs/assets/external_validation/success/tomato_early_blight_diagnostic.png
+success,tomato_early_blight_hard,Tomato — Early Blight,Tomato — Early Blight,True,0.426591,6.9324,docs/assets/external_validation/success/tomato_early_blight_hard_original.jpg,docs/assets/external_validation/success/tomato_early_blight_hard_diagnostic.png
+failure,corn_as_wheat,Corn — Gray Leaf Spot,Wheat — Leaf Rust,False,0.964626,23.288,docs/assets/external_validation/failure/corn_as_wheat_original.jpg,docs/assets/external_validation/failure/corn_as_wheat_diagnostic.png
+failure,potato_as_tomato,Potato — Late Blight,Tomato — Early Blight,False,0.998451,12.9879,docs/assets/external_validation/failure/potato_as_tomato_original.jpg,docs/assets/external_validation/failure/potato_as_tomato_diagnostic.png
