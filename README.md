@@ -270,10 +270,6 @@ python scripts/run_batch_inference.py \
 - Current benchmark results come from PlantSeg; robustness on uncontrolled field imagery and video has not yet been established.
 - Classification, segmentation, and burden estimation are separate tasks, so no single combined “overall AI accuracy” is reported.
 
-## Next Steps
-
-Planned work includes real-world image evaluation, video inference, and a lightweight deployment interface.
-
 ## Reproducibility
 
 The benchmark split is duplicate-aware and leakage-controlled. Classification, segmentation, and burden metrics are evaluated on aligned held-out samples so cross-task analysis is directly comparable.
